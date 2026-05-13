@@ -33,6 +33,18 @@ const goals = ["Clients", "Collaborators", "Mentors", "Investors", "Vendors", "S
 const interests = ["Sports", "Music", "Travel", "Food", "Community", "Fitness", "Youth Leadership", "Art", "Faith", "Tech"];
 const app = document.querySelector("#app");
 
+const navIcons = {
+  home: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V21h13V9.5"/><path d="M9.5 21v-6h5v6"/></svg>',
+  events: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/><path d="M8 14h3M13 14h3M8 17h3"/></svg>',
+  connections: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8.5" cy="8" r="3"/><circle cx="16.5" cy="9" r="2.5"/><path d="M3.5 20c.8-3.2 2.7-5 5-5s4.2 1.8 5 5"/><path d="M13.5 17c.8-1.5 1.9-2.3 3.2-2.3 1.8 0 3.2 1.3 3.8 3.8"/></svg>',
+  messages: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-5 4v-4.5A2 2 0 0 1 3 15V7a2 2 0 0 1 2-2Z"/><path d="M8 9h8M8 12h5"/></svg>',
+  feed: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>',
+  account: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c1-4 3.5-6 7-6s6 2 7 6"/></svg>',
+  admin: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-2.8 8-7 10-4.2-2-7-5.5-7-10V6l7-3Z"/><path d="M9 12l2 2 4-5"/></svg>'
+};
+function navIcon(id) { return navIcons[id] || navIcons.home; }
+
+
 async function api(path, options = {}) {
   const response = await fetch(path, { ...options, headers: { "content-type": "application/json", ...(options.headers || {}) } });
   const data = await response.json();
@@ -153,9 +165,9 @@ async function saveProfile(profile) {
 }
 
 function renderApp() {
-  const tabs = [["home", "⌂", "Home"], ["events", "📅", "Events"], ["connections", "👥", "Connect"], ["messages", "💬", "Messages"], ["feed", "◆", "Feed"], ["account", "⚙", "Account"]];
-  if (state.user.isAdmin) tabs.push(["admin", "♛", "Admin"]);
-  app.innerHTML = `<main class="page"><div class="app-wrap"><section class="phone"><header class="top"><div><p class="eyebrow">Prime Connects Inc.</p><h1>One Network. Endless Possibilities.</h1></div><button class="icon" data-home title="Home">⌂</button></header><div class="content">${screen()}</div><nav class="nav">${tabs.map(([id, icon, label]) => `<button class="${state.tab === id ? "active" : ""}" data-tab="${id}"><span>${icon}</span><span>${label}</span></button>`).join("")}</nav></section><aside class="desktop-panel"><p class="eyebrow">MVP Console</p><h2>Built for mobile and ready for web.</h2><p>Use Home to return to the signed-in landing page. Admin users can manage events, flyers, RSVP links, badges, and users.</p><div class="metrics"><div><strong>${state.data.events.length}</strong><span>Published events</span></div><div><strong>${state.data.connections.length}</strong><span>Your connections</span></div></div></aside></div></main>`;
+  const tabs = [["home", "Home"], ["events", "Events"], ["connections", "Connect"], ["messages", "Messages"], ["feed", "Feed"], ["account", "Account"]];
+  if (state.user.isAdmin) tabs.push(["admin", "Admin"]);
+  app.innerHTML = `<main class="page"><div class="app-wrap"><section class="phone"><header class="top"><div><p class="eyebrow">Prime Connects Inc.</p><h1>One Network. Endless Possibilities.</h1></div><button class="icon home-icon" data-home title="Home">${navIcon("home")}</button></header><div class="content">${screen()}</div><nav class="nav">${tabs.map(([id, label]) => `<button class="${state.tab === id ? "active" : ""}" data-tab="${id}">${navIcon(id)}<span>${label}</span></button>`).join("")}</nav></section><aside class="desktop-panel"><p class="eyebrow">MVP Console</p><h2>Built for mobile and ready for web.</h2><p>Use Home to return to the signed-in landing page. Admin users can manage events, flyers, RSVP links, badges, and users.</p><div class="metrics"><div><strong>${state.data.events.length}</strong><span>Published events</span></div><div><strong>${state.data.connections.length}</strong><span>Your connections</span></div></div></aside></div></main>`;
   document.querySelectorAll("[data-tab]").forEach((button) => button.onclick = () => { state.tab = button.dataset.tab; render(); });
   document.querySelector("[data-home]").onclick = () => { state.tab = "home"; render(); };
   bindScreen();
