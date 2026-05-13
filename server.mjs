@@ -390,6 +390,17 @@ async function api(request, response) {
     return json(response, 200, { users: db.users.map(publicUser), events: db.events, badges: db.badges.map((badge) => typeof badge === "string" ? { name: badge, criteriaType: "manual", criteriaCount: 0 } : badge), toolboxDocuments: db.toolboxDocuments || [] });
   }
 
+  if (route === "POST /api/admin/events/delete") {
+    if (!isAdmin(user)) return json(response, 403, { error: "Admin access required." });
+    const input = await body(request);
+    const eventId = String(input.id ?? "");
+    if (!db.events.some((event) => event.id === eventId)) return json(response, 404, { error: "Event not found." });
+    db.events = db.events.filter((event) => event.id !== eventId);
+    db.attendances = db.attendances.filter((attendance) => attendance.eventId !== eventId);
+    await writeDb(db);
+    return json(response, 200, { ok: true });
+  }
+
   if (route === "POST /api/admin/events") {
     if (!isAdmin(user)) return json(response, 403, { error: "Admin access required." });
     const input = await body(request);
