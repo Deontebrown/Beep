@@ -458,6 +458,16 @@ async function api(request, response) {
     return json(response, 200, { ok: true });
   }
 
+  if (route === "POST /api/admin/toolbox/delete") {
+    if (!isAdmin(user)) return json(response, 403, { error: "Admin access required." });
+    const input = await body(request);
+    const documentId = String(input.id ?? "");
+    if (!db.toolboxDocuments.some((doc) => doc.id === documentId)) return json(response, 404, { error: "Document not found." });
+    db.toolboxDocuments = db.toolboxDocuments.filter((doc) => doc.id !== documentId);
+    await writeDb(db);
+    return json(response, 200, { ok: true });
+  }
+
   if (route === "GET /api/admin") {
     if (!isAdmin(user)) return json(response, 403, { error: "Admin access required." });
     return json(response, 200, { users: db.users.map(publicUser), events: db.events, badges: publicBadges(db), toolboxDocuments: db.toolboxDocuments || [] });
