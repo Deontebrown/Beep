@@ -1,0 +1,295 @@
+import { createServer } from "node:http";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { extname, join, resolve } from "node:path";
+import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+
+const PORT = Number(process.env.PORT ?? 3000);
+const ROOT = process.cwd();
+const PUBLIC_DIR = join(ROOT, "public");
+const DATA_DIR = join(ROOT, "data");
+const DB_PATH = join(DATA_DIR, "prime-connects.db.json");
+const SEED_PATH = join(DATA_DIR, "prime-connects.seed.json");
+const SESSION_SECRET = process.env.SESSION_SECRET ?? "prime-connects-dev-session-secret";
+const SESSION_COOKIE = "prime_session";
+const MIME = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".json": "application/json; charset=utf-8", ".svg": "image/svg+xml" };
+
+async function ensureDb() {
+  await mkdir(DATA_DIR, { recursive: true });
+  if (!existsSync(DB_PATH)) {
+    const seed = JSON.parse(await readFile(SEED_PATH, "utf8"));
+    seed.users = seed.users.map((user) => ({ ...user, passwordHash: user.passwordHash === "demo" ? hashPassword("PrimePass123") : user.passwordHash }));
+    await writeFile(DB_PATH, JSON.stringify(seed, null, 2));
+  }
+}
+
+async function readDb() {
+  await ensureDb();
+  return JSON.parse(await readFile(DB_PATH, "utf8"));
+}
+
+async function writeDb(db) {
+  await writeFile(DB_PATH, JSON.stringify(db, null, 2));
+}
+
+function id(prefix) {
+  return `${prefix}_${randomBytes(8).toString("hex")}`;
+}
+
+function hashPassword(password) {
+  const salt = randomBytes(16).toString("hex");
+  const hash = scryptSync(password, salt, 64).toString("hex");
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password, stored) {
+  const [salt, hash] = stored.split(":");
+  const actual = scryptSync(password, salt, 64);
+  const expected = Buffer.from(hash, "hex");
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
+}
+
+function sign(value) {
+  return createHmac("sha256", SESSION_SECRET).update(value).digest("hex");
+}
+
+function sessionToken(userId) {
+  const payload = `${userId}.${Date.now()}`;
+  return `${payload}.${sign(payload)}`;
+}
+
+function parseCookies(request) {
+  return Object.fromEntries((request.headers.cookie ?? "").split(";").filter(Boolean).map((cookie) => {
+    const [key, ...parts] = cookie.trim().split("=");
+    return [key, decodeURIComponent(parts.join("="))];
+  }));
+}
+
+function sessionUserId(request) {
+  const token = parseCookies(request)[SESSION_COOKIE];
+  if (!token) return null;
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  const payload = `${parts[0]}.${parts[1]}`;
+  return sign(payload) === parts[2] ? parts[0] : null;
+}
+
+function json(response, status, body, headers = {}) {
+  response.writeHead(status, { "content-type": "application/json; charset=utf-8", ...headers });
+  response.end(JSON.stringify(body));
+}
+
+async function body(request) {
+  const chunks = [];
+  for await (const chunk of request) chunks.push(chunk);
+  return chunks.length ? JSON.parse(Buffer.concat(chunks).toString("utf8")) : {};
+}
+
+function publicUser(user) {
+  if (!user) return null;
+  return { id: user.id, email: user.email, emailVerified: user.emailVerified, profileComplete: user.profileComplete, profile: user.profile, badges: user.badges ?? [] };
+}
+
+function tokenSet(value) {
+  return new Set((Array.isArray(value) ? value.join(" ") : value ?? "").toLowerCase().split(/[^a-z0-9]+/).filter((token) => token.length > 2));
+}
+
+function overlap(a, b) {
+  const first = tokenSet(a);
+  const second = tokenSet(b);
+  return [...first].filter((token) => second.has(token)).length;
+}
+
+function scoreMatch(viewer, candidate, db) {
+  let score = 35;
+  if (viewer.industry === candidate.industry) score += 18;
+  if (viewer.businessType !== candidate.businessType) score += 6;
+  score += Math.min(overlap(viewer.lookingFor, candidate.services) * 12, 24);
+  score += Math.min(overlap(viewer.services, candidate.lookingFor) * 10, 20);
+  score += Math.min(overlap(viewer.interests, candidate.interests) * 5, 15);
+  const viewerSwaps = db.skillSwaps.filter((swap) => swap.userId === viewer.userId);
+  const candidateSwaps = db.skillSwaps.filter((swap) => swap.userId === candidate.userId);
+  for (const swap of viewerSwaps) for (const other of candidateSwaps) score += Math.min(overlap(swap.seeking, other.offering) * 8, 16);
+  return Math.max(0, Math.min(99, score));
+}
+
+function authUser(request, db) {
+  const userId = sessionUserId(request);
+  return db.users.find((user) => user.id === userId) ?? null;
+}
+
+function completeRequired(values) {
+  return values.every((value) => Array.isArray(value) ? value.length > 0 : typeof value === "string" && value.trim().length > 0);
+}
+
+async function api(request, response) {
+  const db = await readDb();
+  const url = new URL(request.url, `http://${request.headers.host}`);
+  const route = `${request.method} ${url.pathname}`;
+
+  if (route === "GET /api/me") return json(response, 200, { user: publicUser(authUser(request, db)), counts: { events: db.events.length, members: db.users.filter((user) => user.profileComplete).length } });
+
+  if (route === "POST /api/auth/signup") {
+    const input = await body(request);
+    const email = String(input.email ?? "").toLowerCase().trim();
+    const password = String(input.password ?? "");
+    if (!email.includes("@") || password.length < 8) return json(response, 400, { error: "Use a valid email and a password with 8+ characters." });
+    if (db.users.some((user) => user.email === email)) return json(response, 409, { error: "An account with this email already exists." });
+    const verificationToken = randomBytes(24).toString("hex");
+    db.users.push({ id: id("user"), email, passwordHash: hashPassword(password), emailVerified: false, verificationToken, failedLoginAttempts: 0, lockedUntilReset: false, profileComplete: false, profile: null, badges: [] });
+    await writeDb(db);
+    return json(response, 200, { verificationToken });
+  }
+
+  if (route === "POST /api/auth/verify") {
+    const input = await body(request);
+    const user = db.users.find((candidate) => candidate.verificationToken === input.token);
+    if (!user) return json(response, 404, { error: "Verification link is invalid or expired." });
+    user.emailVerified = true;
+    user.verificationToken = null;
+    await writeDb(db);
+    return json(response, 200, { user: publicUser(user) }, { "set-cookie": `${SESSION_COOKIE}=${sessionToken(user.id)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800` });
+  }
+
+  if (route === "POST /api/auth/login") {
+    const input = await body(request);
+    const user = db.users.find((candidate) => candidate.email === String(input.email ?? "").toLowerCase().trim());
+    if (!user) return json(response, 401, { error: "Invalid email or password." });
+    if (user.lockedUntilReset) return json(response, 423, { error: "This account is locked. Reset your password to continue." });
+    if (!user.emailVerified) return json(response, 403, { error: "Verify your email before signing in." });
+    if (!verifyPassword(String(input.password ?? ""), user.passwordHash)) {
+      user.failedLoginAttempts += 1;
+      if (user.failedLoginAttempts >= 5) user.lockedUntilReset = true;
+      await writeDb(db);
+      return json(response, 401, { error: user.lockedUntilReset ? "Too many attempts. Password reset required." : "Invalid email or password." });
+    }
+    user.failedLoginAttempts = 0;
+    await writeDb(db);
+    return json(response, 200, { user: publicUser(user) }, { "set-cookie": `${SESSION_COOKIE}=${sessionToken(user.id)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800` });
+  }
+
+  if (route === "POST /api/auth/forgot-password") {
+    const input = await body(request);
+    const user = db.users.find((candidate) => candidate.email === String(input.email ?? "").toLowerCase().trim());
+    if (user && String(input.password ?? "").length >= 8) {
+      user.passwordHash = hashPassword(input.password);
+      user.failedLoginAttempts = 0;
+      user.lockedUntilReset = false;
+      await writeDb(db);
+    }
+    return json(response, 200, { ok: true });
+  }
+
+  if (route === "POST /api/auth/logout") return json(response, 200, { ok: true }, { "set-cookie": `${SESSION_COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0` });
+
+  const user = authUser(request, db);
+  if (!user) return json(response, 401, { error: "Authentication required." });
+
+  if (route === "POST /api/profile") {
+    const input = await body(request);
+    if (!completeRequired([input.fullName, input.photoUrl, input.industry, input.businessType, input.title, input.services, input.lookingFor, input.interests])) return json(response, 400, { error: "Complete all required profile fields." });
+    user.profile = { fullName: input.fullName, photoUrl: input.photoUrl, industry: input.industry, businessType: input.businessType, title: input.title, services: input.services, lookingFor: input.lookingFor, interests: input.interests, socialLinks: input.socialLinks ?? "", bio: input.bio ?? "", userId: user.id };
+    user.profileComplete = true;
+    await writeDb(db);
+    return json(response, 200, { user: publicUser(user) });
+  }
+
+  if (!user.profileComplete) return json(response, 403, { error: "Completed profile required." });
+
+  if (route === "GET /api/events") {
+    const events = db.events.map((event) => {
+      const attendees = db.attendances.filter((attendance) => attendance.eventId === event.id && attendance.checkedIn).map((attendance) => db.users.find((candidate) => candidate.id === attendance.userId)).filter(Boolean).filter((candidate) => candidate.id !== user.id && candidate.profileComplete).map((candidate) => ({ ...candidate.profile, id: candidate.id, badges: candidate.badges, matchScore: scoreMatch(user.profile, candidate.profile, db) })).sort((a, b) => b.matchScore - a.matchScore);
+      return { ...event, attendees, pendingMatches: attendees.length < 2 };
+    });
+    return json(response, 200, { events });
+  }
+
+  if (route === "POST /api/events/check-in") {
+    const input = await body(request);
+    const existing = db.attendances.find((attendance) => attendance.userId === user.id && attendance.eventId === input.eventId);
+    if (existing) existing.checkedIn = true;
+    else db.attendances.push({ userId: user.id, eventId: input.eventId, checkedIn: true });
+    if (db.attendances.filter((attendance) => attendance.userId === user.id && attendance.checkedIn).length >= 3 && !user.badges.includes("Event Regular")) user.badges.push("Event Regular");
+    await writeDb(db);
+    return json(response, 200, { ok: true });
+  }
+
+  if (route === "GET /api/connections") {
+    const connections = db.connections.filter((connection) => connection.requesterId === user.id || connection.recipientId === user.id).map((connection) => ({ ...connection, user: publicUser(db.users.find((candidate) => candidate.id === (connection.requesterId === user.id ? connection.recipientId : connection.requesterId))) }));
+    return json(response, 200, { connections });
+  }
+
+  if (route === "POST /api/connections") {
+    const input = await body(request);
+    if (input.recipientId === user.id || !db.users.some((candidate) => candidate.id === input.recipientId)) return json(response, 400, { error: "Choose a valid member to connect with." });
+    const existing = db.connections.find((connection) => (connection.requesterId === user.id && connection.recipientId === input.recipientId) || (connection.requesterId === input.recipientId && connection.recipientId === user.id));
+    if (existing) existing.note = input.note ?? existing.note;
+    else db.connections.push({ id: id("connection"), requesterId: user.id, recipientId: input.recipientId, status: "CONNECTED", note: input.note ?? "", createdAt: new Date().toISOString() });
+    const count = db.connections.filter((connection) => connection.requesterId === user.id || connection.recipientId === user.id).length;
+    const badge = count >= 10 ? "10 Connections" : count >= 5 ? "5 Connections" : count === 1 ? "First Connection" : null;
+    if (badge && !user.badges.includes(badge)) {
+      user.badges.push(badge);
+      db.feedPosts.unshift({ id: id("post"), authorId: user.id, type: "BADGE", body: `Earned the ${badge} badge through Prime Connects.`, createdAt: new Date().toISOString(), likes: [] });
+    }
+    await writeDb(db);
+    return json(response, 200, { ok: true });
+  }
+
+  if (route === "GET /api/feed") return json(response, 200, { posts: db.feedPosts.map((post) => ({ ...post, author: publicUser(db.users.find((candidate) => candidate.id === post.authorId)) })) });
+
+  if (route === "POST /api/feed") {
+    const input = await body(request);
+    const text = String(input.body ?? "").trim();
+    if (text.length < 8) return json(response, 400, { error: "Share a little more detail about your win." });
+    if (/https?:\/\/|www\./i.test(text)) return json(response, 400, { error: "Prime Feed posts cannot include external links or URLs." });
+    db.feedPosts.unshift({ id: id("post"), authorId: user.id, type: "WIN", body: text, createdAt: new Date().toISOString(), likes: [] });
+    await writeDb(db);
+    return json(response, 200, { ok: true });
+  }
+
+  if (route === "GET /api/messages") return json(response, 200, { messages: db.messages.filter((message) => message.senderId === user.id || message.receiverId === user.id).map((message) => ({ ...message, sender: publicUser(db.users.find((candidate) => candidate.id === message.senderId)), receiver: publicUser(db.users.find((candidate) => candidate.id === message.receiverId)) })) });
+
+  if (route === "POST /api/messages") {
+    const input = await body(request);
+    const connected = db.connections.some((connection) => (connection.requesterId === user.id && connection.recipientId === input.receiverId) || (connection.requesterId === input.receiverId && connection.recipientId === user.id));
+    if (!connected) return json(response, 403, { error: "Only connected members can message each other." });
+    db.messages.push({ id: id("message"), senderId: user.id, receiverId: input.receiverId, body: String(input.body ?? "").slice(0, 1000), createdAt: new Date().toISOString() });
+    await writeDb(db);
+    return json(response, 200, { ok: true });
+  }
+
+  if (route === "GET /api/skill-swaps") return json(response, 200, { swaps: db.skillSwaps.map((swap) => ({ ...swap, user: publicUser(db.users.find((candidate) => candidate.id === swap.userId)) })) });
+
+  if (route === "POST /api/skill-swaps") {
+    const input = await body(request);
+    if (!input.offering || !input.seeking) return json(response, 400, { error: "Add what you offer and what you need." });
+    db.skillSwaps.unshift({ id: id("swap"), userId: user.id, offering: input.offering, seeking: input.seeking, completed: false, createdAt: new Date().toISOString() });
+    await writeDb(db);
+    return json(response, 200, { ok: true });
+  }
+
+  return json(response, 404, { error: "Not found." });
+}
+
+async function staticFile(request, response) {
+  const url = new URL(request.url, `http://${request.headers.host}`);
+  const pathname = url.pathname === "/" ? "/index.html" : decodeURIComponent(url.pathname);
+  const filePath = resolve(PUBLIC_DIR, `.${pathname}`);
+  if (!filePath.startsWith(PUBLIC_DIR)) return json(response, 403, { error: "Forbidden." });
+  try {
+    const data = await readFile(filePath);
+    response.writeHead(200, { "content-type": MIME[extname(filePath)] ?? "application/octet-stream" });
+    response.end(data);
+  } catch {
+    response.writeHead(302, { location: "/" });
+    response.end();
+  }
+}
+
+await ensureDb();
+createServer((request, response) => {
+  if (request.url?.startsWith("/api/")) api(request, response);
+  else staticFile(request, response);
+}).listen(PORT, () => {
+  console.log(`Prime Connects MVP running at http://localhost:${PORT}`);
+});

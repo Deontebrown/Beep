@@ -1,0 +1,103 @@
+{
+  "users": [
+    {
+      "id": "user_maya",
+      "email": "maya@primeconnects.test",
+      "passwordHash": "demo",
+      "emailVerified": true,
+      "failedLoginAttempts": 0,
+      "lockedUntilReset": false,
+      "profileComplete": true,
+      "profile": {
+        "fullName": "Maya Johnson",
+        "photoUrl": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80",
+        "industry": "Marketing",
+        "businessType": "Small Business",
+        "title": "Brand Strategist at Golden Hour Studio",
+        "services": ["Brand Design", "Social Media", "Content Creation"],
+        "lookingFor": ["Clients", "Collaborators", "Community Connections"],
+        "interests": ["Music", "Food", "Community", "Art"],
+        "socialLinks": "@goldenhourstudio",
+        "bio": "Helping Indianapolis founders build memorable brands."
+      },
+      "badges": ["First Connection"]
+    },
+    {
+      "id": "user_darius",
+      "email": "darius@primeconnects.test",
+      "passwordHash": "demo",
+      "emailVerified": true,
+      "failedLoginAttempts": 0,
+      "lockedUntilReset": false,
+      "profileComplete": true,
+      "profile": {
+        "fullName": "Darius King",
+        "photoUrl": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80",
+        "industry": "Finance",
+        "businessType": "Established Business",
+        "title": "CPA and Small Business Advisor",
+        "services": ["Accounting", "Funding Strategy", "Business Coaching"],
+        "lookingFor": ["Clients", "Vendors", "Skill Swaps"],
+        "interests": ["Sports", "Community", "Youth Leadership"],
+        "socialLinks": "linkedin.com/in/dariusking",
+        "bio": "Making finances less intimidating for growing businesses."
+      },
+      "badges": ["Event Regular"]
+    },
+    {
+      "id": "user_nia",
+      "email": "nia@primeconnects.test",
+      "passwordHash": "demo",
+      "emailVerified": true,
+      "failedLoginAttempts": 0,
+      "lockedUntilReset": false,
+      "profileComplete": true,
+      "profile": {
+        "fullName": "Nia Brooks",
+        "photoUrl": "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?auto=format&fit=crop&w=300&q=80",
+        "industry": "Arts",
+        "businessType": "Minority-Owned Business",
+        "title": "Photographer and Creative Director",
+        "services": ["Photography", "Content Creation", "Event Planning"],
+        "lookingFor": ["Clients", "Collaborators", "Mentors"],
+        "interests": ["Art", "Travel", "Music", "Food"],
+        "socialLinks": "@niabrookscreates",
+        "bio": "Creating visuals that make community stories impossible to ignore."
+      },
+      "badges": ["Skill Swapper"]
+    }
+  ],
+  "events": [
+    {
+      "id": "event_summer_mixer",
+      "name": "Prime Summer Mixer",
+      "date": "2026-06-20T22:30:00.000Z",
+      "location": "Bottleworks District · Indianapolis, IN",
+      "description": "A polished evening for entrepreneurs, creatives, and corporate partners to make intentional high-value connections.",
+      "dressCode": "Business elevated / cocktail casual"
+    },
+    {
+      "id": "event_next_leaders",
+      "name": "Next Leaders Networking Night",
+      "date": "2026-07-11T21:00:00.000Z",
+      "location": "16 Tech Innovation District · Indianapolis, IN",
+      "description": "A youth and emerging leader networking experience built around mentorship, community, and practical follow-up.",
+      "dressCode": "Smart casual"
+    }
+  ],
+  "attendances": [
+    { "userId": "user_maya", "eventId": "event_summer_mixer", "checkedIn": true },
+    { "userId": "user_darius", "eventId": "event_summer_mixer", "checkedIn": true },
+    { "userId": "user_nia", "eventId": "event_summer_mixer", "checkedIn": true },
+    { "userId": "user_nia", "eventId": "event_next_leaders", "checkedIn": true }
+  ],
+  "connections": [],
+  "messages": [],
+  "feedPosts": [
+    { "id": "post_seed_win", "authorId": "user_maya", "type": "WIN", "body": "Closed a new restaurant branding project after meeting the owner at a Prime Connects mixer.", "createdAt": "2026-05-03T14:00:00.000Z", "likes": ["user_darius", "user_nia"] }
+  ],
+  "skillSwaps": [
+    { "id": "swap_maya", "userId": "user_maya", "offering": "a brand audit and social content plan", "seeking": "bookkeeping workflow coaching", "completed": false, "createdAt": "2026-05-03T14:00:00.000Z" }
+  ],
+  "badges": ["First Connection", "5 Connections", "10 Connections", "Event Regular", "Skill Swapper", "Community Champion", "Prime Connector"]
+}
