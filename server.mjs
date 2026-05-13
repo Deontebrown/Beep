@@ -44,7 +44,17 @@ async function ensureDb() {
 
 async function readDb() {
   await ensureDb();
-  return JSON.parse(await readFile(DB_PATH, "utf8"));
+  return normalizeDb(JSON.parse(await readFile(DB_PATH, "utf8")));
+}
+
+function normalizeDb(db) {
+  for (const key of ["users", "events", "attendances", "connections", "messages", "feedPosts", "skillSwaps", "badges", "toolboxDocuments"]) db[key] ||= [];
+  for (const user of db.users) {
+    user.badges ||= [];
+    user.isAdmin = Boolean(user.isAdmin) || user.email?.toLowerCase() === "networking@primeconnectsindy.com";
+  }
+  db.badges = db.badges.map((badge) => typeof badge === "string" ? { name: badge, criteriaType: "manual", criteriaCount: 0, iconUrl: "" } : { iconUrl: "", criteriaType: "manual", criteriaCount: 0, ...badge });
+  return db;
 }
 
 async function writeDb(db) {
