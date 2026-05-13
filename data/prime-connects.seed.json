@@ -349,5 +349,27 @@
       "criteriaType": "connections",
       "criteriaCount": 100
     }
+  ],
+  "toolboxDocuments": [
+    {
+      "id": "doc_marketing_plan",
+      "title": "Marketing Campaign Planner",
+      "category": "Marketing",
+      "description": "A simple planning worksheet for launch campaigns.",
+      "fileName": "marketing-campaign-planner.pdf",
+      "fileType": "application/pdf",
+      "fileData": "data:application/pdf;base64,JVBERi0xLjQKJVBSSU1FIENPTk5FQ1RTIE1BUktFVElORyBQTElBTk5FUgo=",
+      "createdAt": "2026-05-03T16:00:00.000Z"
+    },
+    {
+      "id": "doc_startup_checklist",
+      "title": "Startup Launch Checklist",
+      "category": "Starting Up",
+      "description": "Checklist for early-stage business setup tasks.",
+      "fileName": "startup-launch-checklist.docx",
+      "fileType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "fileData": "data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,UEsDBBQABgAIAAAAIQ==",
+      "createdAt": "2026-05-03T16:05:00.000Z"
+    }
   ]
 }

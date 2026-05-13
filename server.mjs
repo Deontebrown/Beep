@@ -13,6 +13,25 @@ const SEED_PATH = join(DATA_DIR, "prime-connects.seed.json");
 const SESSION_SECRET = process.env.SESSION_SECRET ?? "prime-connects-dev-session-secret";
 const SESSION_COOKIE = "prime_session";
 const MIME = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".json": "application/json; charset=utf-8", ".svg": "image/svg+xml" };
+const TOOLBOX_CATEGORIES = ["Marketing", "Sales", "Finance", "Starting Up", "HR", "IT", "Products", "Other"];
+const TOOLBOX_EXTENSIONS = new Set([".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".csv", ".rtf", ".odt", ".ods", ".odp"]);
+const TOOLBOX_MIME_TYPES = new Set([
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/rtf",
+  "text/rtf",
+  "text/plain",
+  "text/csv",
+  "application/vnd.oasis.opendocument.text",
+  "application/vnd.oasis.opendocument.spreadsheet",
+  "application/vnd.oasis.opendocument.presentation",
+  "application/octet-stream"
+]);
 
 async function ensureDb() {
   await mkdir(DATA_DIR, { recursive: true });
@@ -124,6 +143,16 @@ function awardEligibleBadges(db, user) {
 
 function normalizeBusinessTypes(value) {
   return Array.isArray(value) ? value.slice(0, 3) : value ? [value] : [];
+}
+
+function cleanFileName(value) {
+  return String(value ?? "document").replace(/[\\/<>:"|?*]+/g, "-").trim() || "document";
+}
+
+function isAllowedToolboxDocument(fileName, fileType) {
+  const extension = extname(cleanFileName(fileName)).toLowerCase();
+  const mimeType = String(fileType ?? "").toLowerCase();
+  return TOOLBOX_EXTENSIONS.has(extension) || TOOLBOX_MIME_TYPES.has(mimeType);
 }
 
 function publicUser(user) {
@@ -335,9 +364,30 @@ async function api(request, response) {
     return json(response, 200, { ok: true });
   }
 
+  if (route === "GET /api/toolbox") {
+    return json(response, 200, { documents: db.toolboxDocuments || [] });
+  }
+
+  if (route === "POST /api/admin/toolbox") {
+    if (!isAdmin(user)) return json(response, 403, { error: "Admin access required." });
+    const input = await body(request);
+    const title = String(input.title ?? "").trim();
+    const category = TOOLBOX_CATEGORIES.includes(input.category) ? input.category : "Other";
+    const fileData = String(input.fileData ?? "").trim();
+    const fileName = cleanFileName(input.fileName || title);
+    const fileType = String(input.fileType || "application/octet-stream").toLowerCase();
+    if (!title || !fileData) return json(response, 400, { error: "Document title and file are required." });
+    if (!fileData.startsWith("data:")) return json(response, 400, { error: "Upload a valid document file." });
+    if (!isAllowedToolboxDocument(fileName, fileType)) return json(response, 400, { error: "Unsupported document type. Upload a PDF, Word, Excel, PowerPoint, text, CSV, RTF, or OpenDocument file." });
+    db.toolboxDocuments = db.toolboxDocuments || [];
+    db.toolboxDocuments.unshift({ id: id("doc"), title, category, description: String(input.description ?? "").trim().slice(0, 220), fileName, fileType, fileData, createdAt: new Date().toISOString() });
+    await writeDb(db);
+    return json(response, 200, { ok: true });
+  }
+
   if (route === "GET /api/admin") {
     if (!isAdmin(user)) return json(response, 403, { error: "Admin access required." });
-    return json(response, 200, { users: db.users.map(publicUser), events: db.events, badges: db.badges.map((badge) => typeof badge === "string" ? { name: badge, criteriaType: "manual", criteriaCount: 0 } : badge) });
+    return json(response, 200, { users: db.users.map(publicUser), events: db.events, badges: db.badges.map((badge) => typeof badge === "string" ? { name: badge, criteriaType: "manual", criteriaCount: 0 } : badge), toolboxDocuments: db.toolboxDocuments || [] });
   }
 
   if (route === "POST /api/admin/events") {
