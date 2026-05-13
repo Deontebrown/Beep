@@ -85,9 +85,22 @@ async function body(request) {
   return chunks.length ? JSON.parse(Buffer.concat(chunks).toString("utf8")) : {};
 }
 
+function onlineStatus(user) {
+  const lastSeen = user?.lastSeenAt ? Date.parse(user.lastSeenAt) : 0;
+  if (!lastSeen) return "offline";
+  const minutes = (Date.now() - lastSeen) / 60000;
+  if (minutes <= 5) return "online";
+  if (minutes <= 60) return "recent";
+  return "offline";
+}
+
+function isAdmin(user) {
+  return user?.email?.toLowerCase() === "networking@primeconnectsindy.com";
+}
+
 function publicUser(user) {
   if (!user) return null;
-  return { id: user.id, email: user.email, emailVerified: user.emailVerified, profileComplete: user.profileComplete, profile: user.profile, badges: user.badges ?? [] };
+  return { id: user.id, email: user.email, isAdmin: isAdmin(user), emailVerified: user.emailVerified, profileComplete: user.profileComplete, profile: user.profile, badges: user.badges ?? [], onlineStatus: onlineStatus(user) };
 }
 
 function tokenSet(value) {
@@ -119,7 +132,7 @@ function authUser(request, db) {
 }
 
 function completeRequired(values) {
-  return values.every((value) => Array.isArray(value) ? value.length > 0 : typeof value === "string" && value.trim().length > 0);
+  return values.every((value) => Array.isArray(value) ? value.length > 0 : typeof value === "number" ? Number.isFinite(value) : typeof value === "string" && value.trim().length > 0);
 }
 
 async function api(request, response) {
@@ -127,7 +140,14 @@ async function api(request, response) {
   const url = new URL(request.url, `http://${request.headers.host}`);
   const route = `${request.method} ${url.pathname}`;
 
-  if (route === "GET /api/me") return json(response, 200, { user: publicUser(authUser(request, db)), counts: { events: db.events.length, members: db.users.filter((user) => user.profileComplete).length } });
+  if (route === "GET /api/me") {
+    const me = authUser(request, db);
+    if (me) {
+      me.lastSeenAt = new Date().toISOString();
+      await writeDb(db);
+    }
+    return json(response, 200, { user: publicUser(me), counts: { events: db.events.length, members: db.users.filter((user) => user.profileComplete).length } });
+  }
 
   if (route === "POST /api/auth/signup") {
     const input = await body(request);
@@ -136,7 +156,7 @@ async function api(request, response) {
     if (!email.includes("@") || password.length < 8) return json(response, 400, { error: "Use a valid email and a password with 8+ characters." });
     if (db.users.some((user) => user.email === email)) return json(response, 409, { error: "An account with this email already exists." });
     const verificationToken = randomBytes(24).toString("hex");
-    db.users.push({ id: id("user"), email, passwordHash: hashPassword(password), emailVerified: false, verificationToken, failedLoginAttempts: 0, lockedUntilReset: false, profileComplete: false, profile: null, badges: [] });
+    db.users.push({ id: id("user"), email, passwordHash: hashPassword(password), emailVerified: false, verificationToken, failedLoginAttempts: 0, lockedUntilReset: false, profileComplete: false, profile: null, badges: [], lastSeenAt: null });
     await writeDb(db);
     return json(response, 200, { verificationToken });
   }
@@ -147,6 +167,7 @@ async function api(request, response) {
     if (!user) return json(response, 404, { error: "Verification link is invalid or expired." });
     user.emailVerified = true;
     user.verificationToken = null;
+    user.lastSeenAt = new Date().toISOString();
     await writeDb(db);
     return json(response, 200, { user: publicUser(user) }, { "set-cookie": `${SESSION_COOKIE}=${sessionToken(user.id)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800` });
   }
@@ -164,6 +185,7 @@ async function api(request, response) {
       return json(response, 401, { error: user.lockedUntilReset ? "Too many attempts. Password reset required." : "Invalid email or password." });
     }
     user.failedLoginAttempts = 0;
+    user.lastSeenAt = new Date().toISOString();
     await writeDb(db);
     return json(response, 200, { user: publicUser(user) }, { "set-cookie": `${SESSION_COOKIE}=${sessionToken(user.id)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800` });
   }
@@ -184,11 +206,13 @@ async function api(request, response) {
 
   const user = authUser(request, db);
   if (!user) return json(response, 401, { error: "Authentication required." });
+  user.lastSeenAt = new Date().toISOString();
 
   if (route === "POST /api/profile") {
     const input = await body(request);
-    if (!completeRequired([input.fullName, input.photoUrl, input.industry, input.businessType, input.title, input.services, input.lookingFor, input.interests])) return json(response, 400, { error: "Complete all required profile fields." });
-    user.profile = { fullName: input.fullName, photoUrl: input.photoUrl, industry: input.industry, businessType: input.businessType, title: input.title, services: input.services, lookingFor: input.lookingFor, interests: input.interests, socialLinks: input.socialLinks ?? "", bio: input.bio ?? "", userId: user.id };
+    if (!completeRequired([input.fullName, input.photoUrl, input.age ?? user.profile?.age, input.industry, input.businessType, input.title, input.services, input.lookingFor, input.interests])) return json(response, 400, { error: "Complete all required profile fields." });
+    const existingAge = user.profile?.age;
+    user.profile = { fullName: input.fullName, photoUrl: input.photoUrl, age: existingAge ?? input.age, industry: input.industry, businessType: input.businessType, title: input.title, services: input.services, lookingFor: input.lookingFor, interests: input.interests, socialLinks: input.socialLinks ?? "", bio: input.bio ?? "", userId: user.id };
     user.profileComplete = true;
     await writeDb(db);
     return json(response, 200, { user: publicUser(user) });
@@ -197,8 +221,9 @@ async function api(request, response) {
   if (!user.profileComplete) return json(response, 403, { error: "Completed profile required." });
 
   if (route === "GET /api/events") {
+    const connectedIds = new Set(db.connections.filter((connection) => connection.requesterId === user.id || connection.recipientId === user.id).map((connection) => connection.requesterId === user.id ? connection.recipientId : connection.requesterId));
     const events = db.events.map((event) => {
-      const attendees = db.attendances.filter((attendance) => attendance.eventId === event.id && attendance.checkedIn).map((attendance) => db.users.find((candidate) => candidate.id === attendance.userId)).filter(Boolean).filter((candidate) => candidate.id !== user.id && candidate.profileComplete).map((candidate) => ({ ...candidate.profile, id: candidate.id, badges: candidate.badges, matchScore: scoreMatch(user.profile, candidate.profile, db) })).sort((a, b) => b.matchScore - a.matchScore);
+      const attendees = db.attendances.filter((attendance) => attendance.eventId === event.id && attendance.checkedIn).map((attendance) => db.users.find((candidate) => candidate.id === attendance.userId)).filter(Boolean).filter((candidate) => candidate.id !== user.id && candidate.profileComplete).map((candidate) => ({ ...candidate.profile, id: candidate.id, badges: candidate.badges, onlineStatus: onlineStatus(candidate), connected: connectedIds.has(candidate.id), matchScore: scoreMatch(user.profile, candidate.profile, db) })).sort((a, b) => b.matchScore - a.matchScore);
       return { ...event, attendees, pendingMatches: attendees.length < 2 };
     });
     return json(response, 200, { events });
@@ -242,6 +267,7 @@ async function api(request, response) {
     const text = String(input.body ?? "").trim();
     if (text.length < 8) return json(response, 400, { error: "Share a little more detail about your win." });
     if (/https?:\/\/|www\./i.test(text)) return json(response, 400, { error: "Prime Feed posts cannot include external links or URLs." });
+    if (/(fuck|shit|bitch|asshole|nude|nudity|sex|porn|xxx)/i.test(text)) return json(response, 400, { error: "Keep Prime Feed posts professional, safe, and focused on wins and connections." });
     db.feedPosts.unshift({ id: id("post"), authorId: user.id, type: "WIN", body: text, createdAt: new Date().toISOString(), likes: [] });
     await writeDb(db);
     return json(response, 200, { ok: true });
@@ -264,6 +290,55 @@ async function api(request, response) {
     const input = await body(request);
     if (!input.offering || !input.seeking) return json(response, 400, { error: "Add what you offer and what you need." });
     db.skillSwaps.unshift({ id: id("swap"), userId: user.id, offering: input.offering, seeking: input.seeking, completed: false, createdAt: new Date().toISOString() });
+    await writeDb(db);
+    return json(response, 200, { ok: true });
+  }
+
+  if (route === "GET /api/admin") {
+    if (!isAdmin(user)) return json(response, 403, { error: "Admin access required." });
+    return json(response, 200, { users: db.users.map(publicUser), events: db.events, badges: db.badges });
+  }
+
+  if (route === "POST /api/admin/events") {
+    if (!isAdmin(user)) return json(response, 403, { error: "Admin access required." });
+    const input = await body(request);
+    const event = input.id ? db.events.find((item) => item.id === input.id) : null;
+    const payload = {
+      id: input.id || id("event"),
+      name: input.name,
+      date: input.date,
+      location: input.location,
+      description: input.description,
+      dressCode: input.dressCode,
+      flyerUrl: input.flyerUrl ?? "",
+      rsvpUrl: input.rsvpUrl ?? ""
+    };
+    if (event) Object.assign(event, payload);
+    else db.events.push(payload);
+    await writeDb(db);
+    return json(response, 200, { event: payload });
+  }
+
+  if (route === "POST /api/admin/badges") {
+    if (!isAdmin(user)) return json(response, 403, { error: "Admin access required." });
+    const input = await body(request);
+    const name = String(input.name ?? "").trim();
+    if (!name) return json(response, 400, { error: "Badge name required." });
+    if (!db.badges.includes(name)) db.badges.push(name);
+    await writeDb(db);
+    return json(response, 200, { badges: db.badges });
+  }
+
+  if (route === "POST /api/admin/users/remove") {
+    if (!isAdmin(user)) return json(response, 403, { error: "Admin access required." });
+    const input = await body(request);
+    if (input.userId === user.id) return json(response, 400, { error: "Admins cannot remove themselves." });
+    db.users = db.users.filter((candidate) => candidate.id !== input.userId);
+    db.attendances = db.attendances.filter((attendance) => attendance.userId !== input.userId);
+    db.connections = db.connections.filter((connection) => connection.requesterId !== input.userId && connection.recipientId !== input.userId);
+    db.messages = db.messages.filter((message) => message.senderId !== input.userId && message.receiverId !== input.userId);
+    db.feedPosts = db.feedPosts.filter((post) => post.authorId !== input.userId);
+    db.skillSwaps = db.skillSwaps.filter((swap) => swap.userId !== input.userId);
     await writeDb(db);
     return json(response, 200, { ok: true });
   }

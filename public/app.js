@@ -1,6 +1,34 @@
-const state = { user: null, counts: { events: 0, members: 0 }, tab: "events", data: { events: [], connections: [], feed: [], messages: [], swaps: [] }, selectedEvent: null, authMode: "signup", verificationToken: null, onboardingStep: 0, onboarding: { fullName: "", photoUrl: "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=300&q=80", industry: "Technology", businessType: "Small Business", title: "", services: [], lookingFor: [], interests: [], socialLinks: "", bio: "" } };
-const industries = ["Technology", "Finance", "Arts", "Real Estate", "Healthcare", "Marketing", "Food & Hospitality", "Education", "Nonprofit", "Construction"];
-const services = ["Brand Design", "Social Media", "Photography", "Accounting", "Legal Support", "Websites", "Event Planning", "Funding Strategy", "Business Coaching", "Content Creation"];
+const state = {
+  user: null,
+  counts: { events: 0, members: 0 },
+  tab: "home",
+  status: "",
+  data: { events: [], connections: [], feed: [], messages: [], swaps: [], admin: null },
+  selectedEvent: null,
+  selectedThread: null,
+  authMode: "signup",
+  verificationToken: null,
+  onboardingStep: 0,
+  onboarding: {
+    fullName: "",
+    photoUrl: "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=300&q=80",
+    age: "",
+    industry: "Technology",
+    businessType: "Small Business",
+    title: "",
+    services: [],
+    lookingFor: [],
+    interests: [],
+    socialLinks: "",
+    bio: ""
+  },
+  profileEdit: null,
+  adminEventEdit: null
+};
+
+const industries = ["Technology", "Finance", "Arts", "Real Estate", "Healthcare", "Marketing", "Business Services", "Food & Hospitality", "Education", "Nonprofit", "Construction", "Other"];
+const businessTypes = ["Small Business", "Minority-Owned Business", "Established Business", "Women Owned Business", "Black Owned", "Start-Up", "Veteran Owned"];
+const services = ["Brand Design", "Social Media", "Photography", "Accounting", "Legal Support", "Websites", "Event Planning", "Funding Strategy", "Business Coaching", "Content Creation", "Business Services"];
 const goals = ["Clients", "Collaborators", "Mentors", "Investors", "Vendors", "Skill Swaps", "Community Connections"];
 const interests = ["Sports", "Music", "Travel", "Food", "Community", "Fitness", "Youth Leadership", "Art", "Faith", "Tech"];
 const app = document.querySelector("#app");
@@ -11,68 +39,158 @@ async function api(path, options = {}) {
   if (!response.ok) throw new Error(data.error || "Something went wrong.");
   return data;
 }
-function h(strings, ...values) { return strings.reduce((out, part, index) => out + part + (values[index] ?? ""), ""); }
 function esc(value) { return String(value ?? "").replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]); }
 function avatar(profile) { return profile?.photoUrl ? `<img class="avatar" src="${esc(profile.photoUrl)}" alt="${esc(profile.fullName)} profile">` : `<div class="avatar">${esc((profile?.fullName || "PC").split(" ").map((p) => p[0]).join("").slice(0, 2))}</div>`; }
-function tags(items) { return `<div class="tags">${(items || []).slice(0, 3).map((tag) => `<em>${esc(tag)}</em>`).join("")}</div>`; }
-async function init() { const me = await api("/api/me"); state.user = me.user; state.counts = me.counts; if (state.user?.profileComplete) await loadAppData(); render(); }
-async function loadAppData() { const [events, connections, feed, messages, swaps] = await Promise.all([api("/api/events"), api("/api/connections"), api("/api/feed"), api("/api/messages"), api("/api/skill-swaps")]); state.data = { events: events.events, connections: connections.connections, feed: feed.posts, messages: messages.messages, swaps: swaps.swaps }; state.selectedEvent ||= state.data.events[0]?.id; }
-function render() { if (!state.user) return renderAuth(); if (!state.user.profileComplete) return renderOnboarding(); renderApp(); }
-function setStatus(message) { const node = document.querySelector(".status"); if (node) node.textContent = message; }
+function tags(items) { return `<div class="tags">${(items || []).slice(0, 4).map((tag) => `<em>${esc(tag)}</em>`).join("")}</div>`; }
+function onlineDot(status) { return `<span class="status-dot ${esc(status || "offline")}" title="${esc(status || "offline")}"></span>`; }
+function setStatus(message) { state.status = message; const node = document.querySelector(".status"); if (node) node.textContent = message; }
+
+async function init() {
+  const me = await api("/api/me");
+  state.user = me.user;
+  state.counts = me.counts;
+  if (state.user?.profileComplete) await loadAppData();
+  render();
+}
+async function loadAppData() {
+  const [events, connections, feed, messages, swaps] = await Promise.all([api("/api/events"), api("/api/connections"), api("/api/feed"), api("/api/messages"), api("/api/skill-swaps")]);
+  state.data = { ...state.data, events: events.events, connections: connections.connections, feed: feed.posts, messages: messages.messages, swaps: swaps.swaps };
+  state.selectedEvent ||= state.data.events[0]?.id;
+  state.selectedThread ||= state.data.connections[0]?.user?.id;
+  if (state.user?.isAdmin) state.data.admin = await api("/api/admin");
+}
+function render() {
+  if (!state.user) return renderAuth();
+  if (!state.user.profileComplete) return renderOnboarding();
+  renderApp();
+}
 
 function renderAuth() {
-  app.innerHTML = h`<main class="page"><div class="auth-wrap"><section class="hero"><div class="brand">♛ Prime Connects Inc.</div><h1>Prime Connects<br>App</h1><p>Enhance every in-person event with intentional introductions, private follow-ups, community wins, and meaningful professional relationships.</p><div class="metrics"><div><strong>${state.counts.events}</strong><span>Seeded events</span></div><div><strong>${state.counts.members}</strong><span>Demo members</span></div></div></section><section class="panel"><p class="eyebrow">Secure account access</p><h2>${state.authMode === "signup" ? "Create your verified account" : state.authMode === "login" ? "Welcome back" : "Reset password"}</h2><label class="field">Email<input id="email" value="founder@primeconnects.test"></label><label class="field">Password<input id="password" type="password" value="PrimePass123"></label><button class="primary" id="authSubmit">${state.authMode === "signup" ? "Sign up" : state.authMode === "login" ? "Log in" : "Reset password"}</button>${state.verificationToken ? `<button class="secondary" id="verify">Verify email and continue</button>` : ""}<p class="status"></p><div class="links"><button data-mode="signup">Sign up</button><button data-mode="login">Log in</button><button data-mode="reset">Forgot password</button></div></section></div></main>`;
-  document.querySelectorAll("[data-mode]").forEach((button) => button.onclick = () => { state.authMode = button.dataset.mode; render(); });
+  app.innerHTML = `<main class="page"><div class="auth-wrap"><section class="hero"><div class="brand">♛ Prime Connects Inc.</div><h1>Prime Connects<br>App</h1><p>Enhance every in-person event with intentional introductions, private follow-ups, community wins, and meaningful professional relationships.</p><div class="metrics"><div><strong>${state.counts.events}</strong><span>Seeded events</span></div><div><strong>${state.counts.members}</strong><span>Demo members</span></div></div></section><section class="panel"><p class="eyebrow">Secure account access</p><h2>${state.authMode === "signup" ? "Create your verified account" : state.authMode === "login" ? "Welcome back" : "Reset password"}</h2><label class="field">Email<input id="email" value="${state.authMode === "login" ? "maya@primeconnects.test" : "founder@primeconnects.test"}"></label><label class="field">Password<input id="password" type="password" value="PrimePass123"></label><button class="primary" id="authSubmit">${state.authMode === "signup" ? "Sign up" : state.authMode === "login" ? "Log in" : "Reset password"}</button>${state.verificationToken ? `<button class="secondary" id="verify">Verify email and continue</button>` : ""}<p class="status">${esc(state.status)}</p><div class="links"><button data-mode="signup">Sign up</button><button data-mode="login">Log in</button><button data-mode="reset">Forgot password</button></div><p class="hint">Admin login: networking@primeconnectsindy.com / PrimePass123</p></section></div></main>`;
+  document.querySelectorAll("[data-mode]").forEach((button) => button.onclick = () => { state.authMode = button.dataset.mode; state.status = ""; render(); });
   document.querySelector("#authSubmit").onclick = authSubmit;
-  if (state.verificationToken) document.querySelector("#verify").onclick = verify;
+  document.querySelector("#verify")?.addEventListener("click", verify);
 }
 async function authSubmit() {
   try {
     const email = document.querySelector("#email").value;
     const password = document.querySelector("#password").value;
-    if (state.authMode === "signup") { const result = await api("/api/auth/signup", { method: "POST", body: JSON.stringify({ email, password }) }); state.verificationToken = result.verificationToken; render(); setStatus("Verification link generated. Use the gold button to simulate the email click."); return; }
-    if (state.authMode === "reset") { await api("/api/auth/forgot-password", { method: "POST", body: JSON.stringify({ email, password }) }); state.authMode = "login"; render(); setStatus("Password reset complete. Sign in with the new password."); return; }
-    const result = await api("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }); state.user = result.user; if (state.user.profileComplete) await loadAppData(); render();
+    if (state.authMode === "signup") {
+      const result = await api("/api/auth/signup", { method: "POST", body: JSON.stringify({ email, password }) });
+      state.verificationToken = result.verificationToken;
+      render();
+      setStatus("Verification link generated. Use the gold button to simulate the email click.");
+      return;
+    }
+    if (state.authMode === "reset") {
+      await api("/api/auth/forgot-password", { method: "POST", body: JSON.stringify({ email, password }) });
+      state.authMode = "login";
+      render();
+      setStatus("Password reset complete. Sign in with the new password.");
+      return;
+    }
+    const result = await api("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+    state.user = result.user;
+    state.tab = "home";
+    if (state.user.profileComplete) await loadAppData();
+    render();
   } catch (error) { setStatus(error.message); }
 }
-async function verify() { const result = await api("/api/auth/verify", { method: "POST", body: JSON.stringify({ token: state.verificationToken }) }); state.user = result.user; render(); }
+async function verify() {
+  const result = await api("/api/auth/verify", { method: "POST", body: JSON.stringify({ token: state.verificationToken }) });
+  state.user = result.user;
+  render();
+}
 
 function renderOnboarding() {
   const step = state.onboardingStep;
-  const progress = Math.round(((step + 1) / 9) * 100);
-  const screens = [textStep("Upload Profile Photo", "photoUrl", "Paste a public image URL or use the default generated portrait."), textStep("Your Name", "fullName", "Enter full name."), selectStep("Your Industry", "industry", industries), choiceStep("Business Type", "businessType", ["Small Business", "Minority-Owned Business", "Established Business"]), textStep("What You Do", "title", "Job title, business name, or one-line description."), multiStep("Services You Offer", "services", services), multiStep("What You're Looking For", "lookingFor", goals), multiStep("Interests & Hobbies", "interests", interests), textStep("Social Media Links", "socialLinks", "Optional but encouraged — LinkedIn, Instagram, or other handles.")];
-  app.innerHTML = `<main class="page"><section class="panel"><p class="eyebrow">Verified as ${esc(state.user.email)}</p><div class="progress"><span style="width:${progress}%"></span></div>${screens[step]}<div class="buttons"><button class="secondary" id="back" ${step === 0 ? "disabled" : ""}>Back</button><button class="primary" id="next">${step === screens.length - 1 ? "Enter Prime Connects" : "Continue"}</button></div><p class="status"></p></section></main>`;
+  const screens = [
+    textStep("Upload Profile Photo", "photoUrl", "Paste a public image URL or use the default generated portrait."),
+    textStep("Your Name", "fullName", "Enter full name."),
+    textStep("Age", "age", "Enter your age once. You cannot edit age after account creation.", "number"),
+    selectStep("Your Industry", "industry", industries),
+    choiceStep("Business Type", "businessType", businessTypes),
+    textStep("What You Do", "title", "Job title, business name, or one-line description."),
+    multiStep("Services You Offer", "services", services, "Add another service"),
+    multiStep("What You're Looking For", "lookingFor", goals, "Add another goal"),
+    multiStep("Interests & Hobbies", "interests", interests, "Add another hobby or interest"),
+    textStep("Social Media Links", "socialLinks", "Optional but encouraged — LinkedIn, Instagram, or other handles.")
+  ];
+  const progress = Math.round(((step + 1) / screens.length) * 100);
+  app.innerHTML = `<main class="page"><section class="panel"><p class="eyebrow">Verified as ${esc(state.user.email)}</p><div class="progress"><span style="width:${progress}%"></span></div>${screens[step]}<div class="buttons"><button class="secondary" id="back" ${step === 0 ? "disabled" : ""}>Back</button><button class="primary" id="next">${step === screens.length - 1 ? "Enter Prime Connects" : "Continue"}</button></div><p class="status">${esc(state.status)}</p></section></main>`;
   bindOnboardingInputs();
   document.querySelector("#back").onclick = () => { state.onboardingStep -= 1; render(); };
-  document.querySelector("#next").onclick = async () => { if (state.onboardingStep < screens.length - 1) { state.onboardingStep += 1; render(); } else await saveProfile(); };
+  document.querySelector("#next").onclick = async () => { if (state.onboardingStep < screens.length - 1) { state.onboardingStep += 1; render(); } else await saveProfile(state.onboarding); };
 }
-function textStep(title, key, help) { return `<div class="step"><h2>${title}</h2><p>${help}</p><input data-field="${key}" value="${esc(state.onboarding[key])}"></div>`; }
+function textStep(title, key, help, type = "text") { return `<div class="step"><h2>${title}</h2><p>${help}</p><input data-field="${key}" type="${type}" value="${esc(state.onboarding[key])}"></div>`; }
 function selectStep(title, key, options) { return `<div class="step"><h2>${title}</h2><select data-field="${key}">${options.map((option) => `<option ${state.onboarding[key] === option ? "selected" : ""}>${option}</option>`).join("")}</select></div>`; }
 function choiceStep(title, key, options) { return `<div class="step"><h2>${title}</h2><div class="chips">${options.map((option) => `<button class="chip ${state.onboarding[key] === option ? "active" : ""}" data-choice="${key}:${option}">${option}</button>`).join("")}</div></div>`; }
-function multiStep(title, key, options) { return `<div class="step"><h2>${title}</h2><div class="chips">${options.map((option) => `<button class="chip ${state.onboarding[key].includes(option) ? "active" : ""}" data-multi="${key}:${option}">${option}</button>`).join("")}</div></div>`; }
-function bindOnboardingInputs() { document.querySelectorAll("[data-field]").forEach((input) => input.oninput = () => state.onboarding[input.dataset.field] = input.value); document.querySelectorAll("[data-choice]").forEach((button) => button.onclick = () => { const [key, value] = button.dataset.choice.split(":"); state.onboarding[key] = value; render(); }); document.querySelectorAll("[data-multi]").forEach((button) => button.onclick = () => { const [key, value] = button.dataset.multi.split(":"); state.onboarding[key] = state.onboarding[key].includes(value) ? state.onboarding[key].filter((item) => item !== value) : [...state.onboarding[key], value]; render(); }); }
-async function saveProfile() { try { const result = await api("/api/profile", { method: "POST", body: JSON.stringify(state.onboarding) }); state.user = result.user; await loadAppData(); render(); } catch (error) { setStatus(error.message); } }
+function multiStep(title, key, options, placeholder) { return `<div class="step"><h2>${title}</h2><div class="chips">${options.map((option) => `<button class="chip ${state.onboarding[key].includes(option) ? "active" : ""}" data-multi="${key}:${option}">${option}</button>`).join("")}</div><div class="add-row"><input id="custom-${key}" placeholder="${placeholder}"><button class="mini" data-add-custom="${key}">+ Add</button></div></div>`; }
+function bindOnboardingInputs() {
+  document.querySelectorAll("[data-field]").forEach((input) => input.oninput = () => state.onboarding[input.dataset.field] = input.value);
+  document.querySelectorAll("[data-choice]").forEach((button) => button.onclick = () => { const [key, value] = button.dataset.choice.split(":"); state.onboarding[key] = value; render(); });
+  document.querySelectorAll("[data-multi]").forEach((button) => button.onclick = () => toggleArrayValue(state.onboarding, ...button.dataset.multi.split(":")));
+  document.querySelectorAll("[data-add-custom]").forEach((button) => button.onclick = () => addCustomValue(state.onboarding, button.dataset.addCustom));
+}
+function toggleArrayValue(target, key, value) { target[key] = target[key].includes(value) ? target[key].filter((item) => item !== value) : [...target[key], value]; render(); }
+function addCustomValue(target, key) { const input = document.querySelector(`#custom-${key}`); const value = input.value.trim(); if (value && !target[key].includes(value)) target[key].push(value); render(); }
+async function saveProfile(profile) {
+  try {
+    const result = await api("/api/profile", { method: "POST", body: JSON.stringify(profile) });
+    state.user = result.user;
+    state.profileEdit = null;
+    state.tab = "home";
+    await loadAppData();
+    render();
+  } catch (error) { setStatus(error.message); }
+}
 
 function renderApp() {
-  app.innerHTML = `<main class="page"><div class="app-wrap"><section class="phone"><header class="top"><div><p class="eyebrow">Prime Connects Inc.</p><h1>One Network. Endless Possibilities.</h1></div><button class="icon">🔔</button></header><div class="content">${screen()}</div><nav class="nav">${[["events","📅","Events"],["connections","👥","Connect"],["messages","💬","Messages"],["feed","◆","Feed"],["account","⚙","Account"]].map(([id, icon, label]) => `<button class="${state.tab === id ? "active" : ""}" data-tab="${id}"><span>${icon}</span><span>${label}</span></button>`).join("")}</nav></section><aside class="desktop-panel"><p class="eyebrow">MVP Console</p><h2>Built for mobile and ready for web.</h2><p>Real file-database-backed authentication, Hinge-style onboarding, event check-ins, AI-style matching, connections, private messaging, feed moderation, badges, and skill swaps are wired through Node API routes.</p><div class="metrics"><div><strong>${state.data.events.length}</strong><span>Published events</span></div><div><strong>${state.data.connections.length}</strong><span>Your connections</span></div></div></aside></div></main>`;
+  const tabs = [["home", "⌂", "Home"], ["events", "📅", "Events"], ["connections", "👥", "Connect"], ["messages", "💬", "Messages"], ["feed", "◆", "Feed"], ["account", "⚙", "Account"]];
+  if (state.user.isAdmin) tabs.push(["admin", "♛", "Admin"]);
+  app.innerHTML = `<main class="page"><div class="app-wrap"><section class="phone"><header class="top"><div><p class="eyebrow">Prime Connects Inc.</p><h1>One Network. Endless Possibilities.</h1></div><button class="icon" data-home title="Home">⌂</button></header><div class="content">${screen()}</div><nav class="nav">${tabs.map(([id, icon, label]) => `<button class="${state.tab === id ? "active" : ""}" data-tab="${id}"><span>${icon}</span><span>${label}</span></button>`).join("")}</nav></section><aside class="desktop-panel"><p class="eyebrow">MVP Console</p><h2>Built for mobile and ready for web.</h2><p>Use Home to return to the signed-in landing page. Admin users can manage events, flyers, RSVP links, badges, and users.</p><div class="metrics"><div><strong>${state.data.events.length}</strong><span>Published events</span></div><div><strong>${state.data.connections.length}</strong><span>Your connections</span></div></div></aside></div></main>`;
   document.querySelectorAll("[data-tab]").forEach((button) => button.onclick = () => { state.tab = button.dataset.tab; render(); });
+  document.querySelector("[data-home]").onclick = () => { state.tab = "home"; render(); };
   bindScreen();
 }
-function screen() { return ({ events: eventsScreen, connections: connectionsScreen, messages: messagesScreen, feed: feedScreen, account: accountScreen })[state.tab](); }
-function eventsScreen() { const event = state.data.events.find((item) => item.id === state.selectedEvent) || state.data.events[0]; return `<section class="screen"><h2>Upcoming Events</h2><div class="stack">${state.data.events.map((item) => `<button class="event-card" data-event="${item.id}"><span>${new Date(item.date).toLocaleDateString([], { month: "short", day: "numeric" })}</span><strong>${esc(item.name)}</strong><small>${esc(item.location)}</small></button>`).join("")}</div>${event ? `<div class="detail"><p class="eyebrow">Event detail</p><h3>${esc(event.name)}</h3><p>${esc(event.description)}</p><p><strong>Dress code:</strong> ${esc(event.dressCode)}</p><button class="primary" id="checkIn">✓ Check in and activate matching</button>${event.pendingMatches ? `<div class="pending">✦ Pending — Waiting for More Attendees</div>` : ""}<h4>AI-ranked attendees</h4>${event.attendees.map(memberCard).join("")}</div>` : ""}</section>`; }
-function memberCard(attendee) { return `<article class="member">${avatar(attendee)}<div><div class="member-head"><strong>${esc(attendee.fullName)}</strong><span>${attendee.matchScore}%</span></div><p>${esc(attendee.title)} · ${esc(attendee.industry)}</p><small>${esc(attendee.businessType)}</small>${tags(attendee.lookingFor)}<input data-note="${attendee.id}" placeholder="Private note: where you met / follow-up"><button class="mini" data-connect="${attendee.id}">🤝 Connect</button></div></article>`; }
-function connectionsScreen() { const top = state.data.events.flatMap((event) => event.attendees).sort((a, b) => b.matchScore - a.matchScore).slice(0, 5); return `<section class="screen"><h2>Connections</h2><p>Browse top AI-matched attendees, connect, and save private context notes.</p><h3>Top matches</h3>${top.map(memberCard).join("")}<h3>Your network</h3>${state.data.connections.map((connection) => `<article class="row">${avatar(connection.user.profile)}<div><strong>${esc(connection.user.profile?.fullName)}</strong><p>${esc(connection.note || "No note yet.")}</p></div></article>`).join("")}</section>`; }
-function messagesScreen() { return `<section class="screen"><h2>Private Messages</h2><p>Only mutually connected users can message each other. Message content stays private and is not used for matching.</p>${state.data.messages.map((message) => `<div class="bubble ${message.senderId === state.user.id ? "mine" : ""}">${esc(message.body)}<small>${esc(message.sender.profile?.fullName)}</small></div>`).join("")}<select id="receiver">${state.data.connections.map((connection) => `<option value="${connection.user.id}">${esc(connection.user.profile?.fullName)}</option>`).join("")}</select><input id="messageBody" placeholder="Write a private message"><button class="primary" id="sendMessage">Send message</button></section>`; }
-function feedScreen() { return `<section class="screen"><h2>Prime Feed</h2><textarea id="postBody" placeholder="Share a professional win from Prime Connects. No links, profanity, or off-topic posts."></textarea><button class="primary" id="sharePost">◆ Share win</button>${state.data.feed.map((post) => `<article class="feed"><div class="row">${avatar(post.author.profile)}<div><strong>${esc(post.author.profile?.fullName || "Prime Member")}</strong><p>${post.type === "BADGE" ? "Badge achievement" : esc(post.author.profile?.title)}</p></div></div><p>${esc(post.body)}</p><small>${post.likes.length} likes · Comments enabled</small></article>`).join("")}</section>`; }
-function accountScreen() { return `<section class="screen"><div class="profile">${avatar(state.user.profile)}<h2>${esc(state.user.profile.fullName)}</h2><p>${esc(state.user.profile.title)}</p></div><div class="badge-grid">${state.user.badges.map((badge) => `<div>🏆 ${esc(badge)}</div>`).join("") || "<p>No badges yet.</p>"}</div><h3>Skill Swap</h3><input id="offering" placeholder="I can offer..."><input id="seeking" placeholder="In exchange for..."><button class="primary" id="addSwap">Publish skill swap</button>${state.data.swaps.map((swap) => `<article class="swap"><strong>${esc(swap.user.profile?.fullName)}</strong><p>Offers ${esc(swap.offering)}</p><p>Needs ${esc(swap.seeking)}</p></article>`).join("")}<button class="secondary" id="logout">Log out</button></section>`; }
+function screen() { return ({ home: homeScreen, events: eventsScreen, connections: connectionsScreen, messages: messagesScreen, feed: feedScreen, account: accountScreen, admin: adminScreen })[state.tab](); }
+function homeScreen() { return `<section class="screen"><div class="profile compact">${avatar(state.user.profile)}<h2>Welcome, ${esc(state.user.profile.fullName.split(" ")[0])}</h2><p>${esc(state.user.profile.title)}</p></div><div class="home-grid"><button class="event-card" data-tab="events"><span>Next step</span><strong>Find an event</strong><small>RSVP and see AI matches.</small></button><button class="event-card" data-tab="connections"><span>Network</span><strong>${state.data.connections.length} connections</strong><small>Follow up with private notes.</small></button><button class="event-card" data-tab="feed"><span>Community</span><strong>Prime Feed</strong><small>Share wins and connection stories.</small></button></div><h3>Upcoming</h3>${state.data.events.slice(0, 2).map(eventSummary).join("")}</section>`; }
+function eventSummary(item) { return `<article class="event-card"><span>${new Date(item.date).toLocaleDateString([], { month: "short", day: "numeric" })}</span><strong>${esc(item.name)}</strong><small>${esc(item.location)}</small></article>`; }
+function eventsScreen() {
+  const event = state.data.events.find((item) => item.id === state.selectedEvent) || state.data.events[0];
+  return `<section class="screen"><h2>Upcoming Events</h2><div class="stack">${state.data.events.map((item) => `<button class="event-card" data-event="${item.id}"><span>${new Date(item.date).toLocaleDateString([], { month: "short", day: "numeric" })}</span><strong>${esc(item.name)}</strong><small>${esc(item.location)}</small></button>`).join("")}</div>${event ? `<div class="detail">${event.flyerUrl ? `<img class="flyer" src="${esc(event.flyerUrl)}" alt="${esc(event.name)} flyer">` : ""}<p class="eyebrow">Event detail</p><h3>${esc(event.name)}</h3><p>${esc(event.description)}</p><p><strong>Dress code:</strong> ${esc(event.dressCode)}</p><button class="primary" id="rsvp">I'll be there</button>${event.pendingMatches ? `<div class="pending">✦ Pending — Waiting for More Attendees</div>` : ""}<h4>AI-ranked attendees</h4>${event.attendees.map(memberCard).join("")}</div>` : ""}</section>`;
+}
+function memberCard(attendee) { return `<article class="member">${avatar(attendee)}<div><div class="member-head"><strong>${esc(attendee.fullName)} ${onlineDot(attendee.onlineStatus)}</strong><span>${attendee.connected ? "✓ Connected" : `${attendee.matchScore}%`}</span></div><p>${esc(attendee.title)} · ${esc(attendee.industry)}</p><small>${esc(attendee.businessType)}</small>${tags(attendee.lookingFor)}${attendee.connected ? `<div class="connected-pill">✓ Connected</div>` : `<input data-note="${attendee.id}" placeholder="Private note: where you met / follow-up"><button class="mini" data-connect="${attendee.id}">🤝 Connect</button>`}</div></article>`; }
+function connectionsScreen() { const top = state.data.events.flatMap((event) => event.attendees).sort((a, b) => b.matchScore - a.matchScore).slice(0, 5); return `<section class="screen"><h2>Connections</h2><p>Browse top AI-matched attendees, connect, and save private context notes.</p><h3>Top matches</h3>${top.map(memberCard).join("")}<h3>Your network</h3>${state.data.connections.map((connection) => `<article class="row thread-row" data-thread="${connection.user.id}">${avatar(connection.user.profile)}<div><strong>${esc(connection.user.profile?.fullName)} ${onlineDot(connection.user.onlineStatus)}</strong><p>${esc(connection.note || "No note yet.")}</p></div><span class="connected-pill">✓ Connected</span></article>`).join("") || "<p>No connections yet.</p>"}</section>`; }
+function messagesScreen() {
+  const selected = state.data.connections.find((connection) => connection.user.id === state.selectedThread) || state.data.connections[0];
+  const threadMessages = selected ? state.data.messages.filter((message) => [message.senderId, message.receiverId].includes(selected.user.id)) : [];
+  return `<section class="screen"><h2>Private Messages</h2><p>Each conversation is separated into its own private thread between only two connected members.</p><div class="thread-list">${state.data.connections.map((connection) => `<button class="thread-chip ${selected?.user.id === connection.user.id ? "active" : ""}" data-thread="${connection.user.id}">${avatar(connection.user.profile)}<span>${esc(connection.user.profile?.fullName)}</span>${onlineDot(connection.user.onlineStatus)}</button>`).join("") || "<p>Connect with someone before messaging.</p>"}</div>${selected ? `<h3>Thread with ${esc(selected.user.profile?.fullName)}</h3>${threadMessages.map((message) => `<div class="bubble ${message.senderId === state.user.id ? "mine" : ""}">${esc(message.body)}<small>${esc(message.sender.profile?.fullName)}</small></div>`).join("")}<input id="messageBody" placeholder="Write a private message"><button class="primary" id="sendMessage">Send message</button>` : ""}</section>`;
+}
+function feedScreen() { return `<section class="screen"><h2>Prime Feed</h2><p>Keep posts professional and focused on wins and connections. External links, nudity, and profanity are blocked.</p><textarea id="postBody" placeholder="Share a professional win from Prime Connects."></textarea><button class="primary" id="sharePost">◆ Share win</button><p class="status">${esc(state.status)}</p>${state.data.feed.map((post) => `<article class="feed"><div class="row">${avatar(post.author.profile)}<div><strong>${esc(post.author.profile?.fullName || "Prime Member")}</strong><p>${post.type === "BADGE" ? "Badge achievement" : esc(post.author.profile?.title)}</p></div></div><p>${esc(post.body)}</p><small>${post.likes.length} likes · Comments enabled</small></article>`).join("")}</section>`; }
+function accountScreen() {
+  const profile = state.profileEdit || structuredClone(state.user.profile);
+  return `<section class="screen"><div class="profile">${avatar(state.user.profile)}<h2>${esc(state.user.profile.fullName)}</h2><p>${esc(state.user.profile.title)}</p></div><div class="badge-grid">${state.user.badges.map((badge) => `<div>🏆 ${esc(badge)}</div>`).join("") || "<p>No badges yet.</p>"}</div><h3>Edit profile</h3><label class="field">Profile picture URL<input id="editPhoto" value="${esc(profile.photoUrl)}"></label><label class="field">Full name<input id="editName" value="${esc(profile.fullName)}"></label><label class="field">Age cannot be edited<input value="${esc(profile.age)}" disabled></label><label class="field">Industry<select id="editIndustry">${industries.map((item) => `<option ${profile.industry === item ? "selected" : ""}>${item}</option>`).join("")}</select></label><label class="field">Business type<select id="editBusinessType">${businessTypes.map((item) => `<option ${profile.businessType === item ? "selected" : ""}>${item}</option>`).join("")}</select></label><label class="field">What you do<input id="editTitle" value="${esc(profile.title)}"></label><label class="field">Social links<input id="editSocial" value="${esc(profile.socialLinks)}"></label><button class="primary" id="saveProfile">Save profile changes</button><h3>Skill Swap</h3><input id="offering" placeholder="I can offer..."><input id="seeking" placeholder="In exchange for..."><button class="primary" id="addSwap">Publish skill swap</button>${state.data.swaps.map((swap) => `<article class="swap"><strong>${esc(swap.user.profile?.fullName)}</strong><p>Offers ${esc(swap.offering)}</p><p>Needs ${esc(swap.seeking)}</p></article>`).join("")}<button class="secondary" id="logout">Log out</button></section>`;
+}
+function adminScreen() {
+  const admin = state.data.admin || { users: [], events: [], badges: [] };
+  const editing = state.adminEventEdit || { name: "", date: "", location: "", description: "", dressCode: "", flyerUrl: "", rsvpUrl: "" };
+  return `<section class="screen"><h2>Admin Portal</h2><p>Signed in as networking@primeconnectsindy.com. Manage event details, flyers, RSVP links, badges, and users.</p><h3>Events</h3><select id="adminEventSelect"><option value="">Create new event</option>${admin.events.map((event) => `<option value="${event.id}">${esc(event.name)}</option>`).join("")}</select><input id="adminName" placeholder="Event name" value="${esc(editing.name)}"><input id="adminDate" placeholder="Event date ISO" value="${esc(editing.date)}"><input id="adminLocation" placeholder="Location" value="${esc(editing.location)}"><input id="adminDress" placeholder="Dress code" value="${esc(editing.dressCode)}"><input id="adminFlyer" placeholder="Event flyer URL" value="${esc(editing.flyerUrl)}"><input id="adminRsvp" placeholder="I'll be there RSVP link" value="${esc(editing.rsvpUrl)}"><textarea id="adminDescription" placeholder="Description">${esc(editing.description)}</textarea><button class="primary" id="saveEvent">Save event</button><h3>Badges</h3><input id="badgeName" placeholder="New badge name"><button class="primary" id="createBadge">Create badge</button><div class="tags">${admin.badges.map((badge) => `<em>${esc(badge)}</em>`).join("")}</div><h3>Users</h3>${admin.users.map((user) => `<article class="row"><div>${avatar(user.profile)}</div><div><strong>${esc(user.profile?.fullName || user.email)} ${onlineDot(user.onlineStatus)}</strong><p>${esc(user.email)}</p></div>${user.email !== state.user.email ? `<button class="mini danger" data-remove-user="${user.id}">Remove</button>` : ""}</article>`).join("")}</section>`;
+}
 function bindScreen() {
   document.querySelectorAll("[data-event]").forEach((button) => button.onclick = () => { state.selectedEvent = button.dataset.event; render(); });
-  document.querySelector("#checkIn")?.addEventListener("click", async () => { await api("/api/events/check-in", { method: "POST", body: JSON.stringify({ eventId: state.selectedEvent }) }); await loadAppData(); render(); });
+  document.querySelector("#rsvp")?.addEventListener("click", async () => { const event = state.data.events.find((item) => item.id === state.selectedEvent); await api("/api/events/check-in", { method: "POST", body: JSON.stringify({ eventId: state.selectedEvent }) }); await loadAppData(); render(); if (event?.rsvpUrl) window.open(event.rsvpUrl, "_blank", "noopener"); });
   document.querySelectorAll("[data-connect]").forEach((button) => button.onclick = async () => { const recipientId = button.dataset.connect; const note = document.querySelector(`[data-note="${recipientId}"]`)?.value || ""; await api("/api/connections", { method: "POST", body: JSON.stringify({ recipientId, note }) }); await loadAppData(); render(); });
-  document.querySelector("#sendMessage")?.addEventListener("click", async () => { await api("/api/messages", { method: "POST", body: JSON.stringify({ receiverId: document.querySelector("#receiver").value, body: document.querySelector("#messageBody").value }) }); await loadAppData(); render(); });
-  document.querySelector("#sharePost")?.addEventListener("click", async () => { await api("/api/feed", { method: "POST", body: JSON.stringify({ body: document.querySelector("#postBody").value }) }); await loadAppData(); render(); });
+  document.querySelectorAll("[data-thread]").forEach((button) => button.onclick = () => { state.selectedThread = button.dataset.thread; state.tab = "messages"; render(); });
+  document.querySelector("#sendMessage")?.addEventListener("click", async () => { await api("/api/messages", { method: "POST", body: JSON.stringify({ receiverId: state.selectedThread, body: document.querySelector("#messageBody").value }) }); await loadAppData(); render(); });
+  document.querySelector("#sharePost")?.addEventListener("click", async () => { try { await api("/api/feed", { method: "POST", body: JSON.stringify({ body: document.querySelector("#postBody").value }) }); state.status = ""; await loadAppData(); render(); } catch (error) { setStatus(error.message); } });
   document.querySelector("#addSwap")?.addEventListener("click", async () => { await api("/api/skill-swaps", { method: "POST", body: JSON.stringify({ offering: document.querySelector("#offering").value, seeking: document.querySelector("#seeking").value }) }); await loadAppData(); render(); });
-  document.querySelector("#logout")?.addEventListener("click", async () => { await api("/api/auth/logout", { method: "POST" }); state.user = null; render(); });
+  document.querySelector("#saveProfile")?.addEventListener("click", async () => { const current = state.user.profile; await saveProfile({ ...current, photoUrl: document.querySelector("#editPhoto").value, fullName: document.querySelector("#editName").value, industry: document.querySelector("#editIndustry").value, businessType: document.querySelector("#editBusinessType").value, title: document.querySelector("#editTitle").value, socialLinks: document.querySelector("#editSocial").value }); });
+  document.querySelector("#logout")?.addEventListener("click", async () => { await api("/api/auth/logout", { method: "POST" }); state.user = null; state.tab = "home"; render(); });
+  document.querySelector("#adminEventSelect")?.addEventListener("change", (event) => { state.adminEventEdit = state.data.admin.events.find((item) => item.id === event.target.value) || null; render(); });
+  document.querySelector("#saveEvent")?.addEventListener("click", async () => { await api("/api/admin/events", { method: "POST", body: JSON.stringify({ id: state.adminEventEdit?.id, name: document.querySelector("#adminName").value, date: document.querySelector("#adminDate").value, location: document.querySelector("#adminLocation").value, dressCode: document.querySelector("#adminDress").value, flyerUrl: document.querySelector("#adminFlyer").value, rsvpUrl: document.querySelector("#adminRsvp").value, description: document.querySelector("#adminDescription").value }) }); state.adminEventEdit = null; await loadAppData(); render(); });
+  document.querySelector("#createBadge")?.addEventListener("click", async () => { await api("/api/admin/badges", { method: "POST", body: JSON.stringify({ name: document.querySelector("#badgeName").value }) }); await loadAppData(); render(); });
+  document.querySelectorAll("[data-remove-user]").forEach((button) => button.onclick = async () => { await api("/api/admin/users/remove", { method: "POST", body: JSON.stringify({ userId: button.dataset.removeUser }) }); await loadAppData(); render(); });
 }
 
 init().catch((error) => { app.innerHTML = `<main class="page"><section class="panel"><h2>Prime Connects</h2><p class="status">${esc(error.message)}</p></section></main>`; });
