@@ -340,6 +340,31 @@ async function api(request, response) {
   }
 
 
+  if (route === "POST /api/feed/edit") {
+    const input = await body(request);
+    const post = db.feedPosts.find((item) => item.id === input.postId);
+    if (!post) return json(response, 404, { error: "Feed post not found." });
+    if (post.authorId !== user.id) return json(response, 403, { error: "You can only edit your own posts." });
+    const text = String(input.body ?? "").trim();
+    if (text.length < 8) return json(response, 400, { error: "Share a little more detail about your win." });
+    if (/https?:\/\/|www\./i.test(text)) return json(response, 400, { error: "Prime Feed posts cannot include external links or URLs." });
+    if (/(fuck|shit|bitch|asshole|nude|nudity|sex|porn|xxx)/i.test(text)) return json(response, 400, { error: "Keep Prime Feed posts professional, safe, and focused on wins and connections." });
+    post.body = text;
+    post.editedAt = new Date().toISOString();
+    await writeDb(db);
+    return json(response, 200, { ok: true });
+  }
+
+  if (route === "POST /api/feed/delete") {
+    const input = await body(request);
+    const post = db.feedPosts.find((item) => item.id === input.postId);
+    if (!post) return json(response, 404, { error: "Feed post not found." });
+    if (post.authorId !== user.id) return json(response, 403, { error: "You can only delete your own posts." });
+    db.feedPosts = db.feedPosts.filter((item) => item.id !== input.postId);
+    await writeDb(db);
+    return json(response, 200, { ok: true });
+  }
+
   if (route === "POST /api/feed/comment") {
     const input = await body(request);
     const post = db.feedPosts.find((item) => item.id === input.postId);
@@ -361,6 +386,29 @@ async function api(request, response) {
     const connected = db.connections.some((connection) => (connection.requesterId === user.id && connection.recipientId === input.receiverId) || (connection.requesterId === input.receiverId && connection.recipientId === user.id));
     if (!connected) return json(response, 403, { error: "Only connected members can message each other." });
     db.messages.push({ id: id("message"), senderId: user.id, receiverId: input.receiverId, body: String(input.body ?? "").slice(0, 1000), createdAt: new Date().toISOString() });
+    await writeDb(db);
+    return json(response, 200, { ok: true });
+  }
+
+  if (route === "POST /api/messages/edit") {
+    const input = await body(request);
+    const message = db.messages.find((item) => item.id === input.messageId);
+    if (!message) return json(response, 404, { error: "Message not found." });
+    if (message.senderId !== user.id) return json(response, 403, { error: "You can only edit your own messages." });
+    const text = String(input.body ?? "").trim();
+    if (!text) return json(response, 400, { error: "Message text required." });
+    message.body = text.slice(0, 1000);
+    message.editedAt = new Date().toISOString();
+    await writeDb(db);
+    return json(response, 200, { ok: true });
+  }
+
+  if (route === "POST /api/messages/delete") {
+    const input = await body(request);
+    const message = db.messages.find((item) => item.id === input.messageId);
+    if (!message) return json(response, 404, { error: "Message not found." });
+    if (message.senderId !== user.id) return json(response, 403, { error: "You can only delete your own messages." });
+    db.messages = db.messages.filter((item) => item.id !== input.messageId);
     await writeDb(db);
     return json(response, 200, { ok: true });
   }
