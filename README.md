@@ -8,16 +8,16 @@ A phone-first web/PWA MVP for the Prime Connects App product spec. It uses the e
 - Verified account sign-up, login, logout, password reset, failed-login lockout after 5 attempts
 - Database-backed sessions using signed HTTP-only cookies
 - File-backed JSON database initialized from `data/prime-connects.seed.json`
-- Hinge-style onboarding with one profile question/action per screen, immutable age, custom services, and custom hobbies/interests
+- Hinge-style onboarding with one profile question/action per screen, immutable age, profile image uploads, custom services, and custom hobbies/interests
 - Events list, event detail, event flyers, RSVP links, check-in, attendee lists, and pending match state
 - AI-style match scoring using industries, services, needs, interests, and skill swaps
 - One-tap connections with private notes and badge auto-posts
 - Private direct messaging only between connected users, separated into one thread per two-person conversation
 - Prime Feed with win posts, badge posts, likes display, no-link moderation, and professional-content filtering
 - Skill Swap publishing
-- Account screen with editable profile details and badges; age cannot be edited after creation
+- Account screen with editable profile details, standard image uploads for profile pictures, and badges; age cannot be edited after creation
 - Online/recent/offline status indicators
-- Admin portal for `networking@primeconnectsindy.com` to manage events, flyers, RSVP links, badges, and users
+- Admin portal for `networking@primeconnectsindy.com` to manage events, uploaded image/PDF flyers, RSVP links, criteria-based badges, and users
 
 ## Run locally
 

@@ -98,6 +98,34 @@ function isAdmin(user) {
   return user?.email?.toLowerCase() === "networking@primeconnectsindy.com";
 }
 
+
+function badgeName(badge) {
+  return typeof badge === "string" ? badge : badge.name;
+}
+
+function connectionCount(db, userId) {
+  return db.connections.filter((connection) => connection.requesterId === userId || connection.recipientId === userId).length;
+}
+
+function awardBadge(db, user, badge) {
+  const name = badgeName(badge);
+  if (!name || user.badges.includes(name)) return false;
+  user.badges.push(name);
+  db.feedPosts.unshift({ id: id("post"), authorId: user.id, type: "BADGE", body: `Earned the ${name} badge through Prime Connects.`, createdAt: new Date().toISOString(), likes: [] });
+  return true;
+}
+
+function awardEligibleBadges(db, user) {
+  for (const badge of db.badges) {
+    if (typeof badge === "string") continue;
+    if (badge.criteriaType === "connections" && connectionCount(db, user.id) >= Number(badge.criteriaCount ?? 0)) awardBadge(db, user, badge);
+  }
+}
+
+function normalizeBusinessTypes(value) {
+  return Array.isArray(value) ? value.slice(0, 3) : value ? [value] : [];
+}
+
 function publicUser(user) {
   if (!user) return null;
   return { id: user.id, email: user.email, isAdmin: isAdmin(user), emailVerified: user.emailVerified, profileComplete: user.profileComplete, profile: user.profile, badges: user.badges ?? [], onlineStatus: onlineStatus(user) };
@@ -116,7 +144,7 @@ function overlap(a, b) {
 function scoreMatch(viewer, candidate, db) {
   let score = 35;
   if (viewer.industry === candidate.industry) score += 18;
-  if (viewer.businessType !== candidate.businessType) score += 6;
+  if (!normalizeBusinessTypes(viewer.businessType).some((type) => normalizeBusinessTypes(candidate.businessType).includes(type))) score += 6;
   score += Math.min(overlap(viewer.lookingFor, candidate.services) * 12, 24);
   score += Math.min(overlap(viewer.services, candidate.lookingFor) * 10, 20);
   score += Math.min(overlap(viewer.interests, candidate.interests) * 5, 15);
@@ -212,7 +240,7 @@ async function api(request, response) {
     const input = await body(request);
     if (!completeRequired([input.fullName, input.photoUrl, input.age ?? user.profile?.age, input.industry, input.businessType, input.title, input.services, input.lookingFor, input.interests])) return json(response, 400, { error: "Complete all required profile fields." });
     const existingAge = user.profile?.age;
-    user.profile = { fullName: input.fullName, photoUrl: input.photoUrl, age: existingAge ?? input.age, industry: input.industry, businessType: input.businessType, title: input.title, services: input.services, lookingFor: input.lookingFor, interests: input.interests, socialLinks: input.socialLinks ?? "", bio: input.bio ?? "", userId: user.id };
+    user.profile = { fullName: input.fullName, photoUrl: input.photoUrl, age: existingAge ?? input.age, industry: input.industry, businessType: normalizeBusinessTypes(input.businessType), title: input.title, services: input.services, lookingFor: input.lookingFor, interests: input.interests, socialLinks: input.socialLinks ?? "", bio: input.bio ?? "", userId: user.id };
     user.profileComplete = true;
     await writeDb(db);
     return json(response, 200, { user: publicUser(user) });
@@ -250,12 +278,10 @@ async function api(request, response) {
     const existing = db.connections.find((connection) => (connection.requesterId === user.id && connection.recipientId === input.recipientId) || (connection.requesterId === input.recipientId && connection.recipientId === user.id));
     if (existing) existing.note = input.note ?? existing.note;
     else db.connections.push({ id: id("connection"), requesterId: user.id, recipientId: input.recipientId, status: "CONNECTED", note: input.note ?? "", createdAt: new Date().toISOString() });
-    const count = db.connections.filter((connection) => connection.requesterId === user.id || connection.recipientId === user.id).length;
+    const count = connectionCount(db, user.id);
     const badge = count >= 10 ? "10 Connections" : count >= 5 ? "5 Connections" : count === 1 ? "First Connection" : null;
-    if (badge && !user.badges.includes(badge)) {
-      user.badges.push(badge);
-      db.feedPosts.unshift({ id: id("post"), authorId: user.id, type: "BADGE", body: `Earned the ${badge} badge through Prime Connects.`, createdAt: new Date().toISOString(), likes: [] });
-    }
+    if (badge) awardBadge(db, user, badge);
+    awardEligibleBadges(db, user);
     await writeDb(db);
     return json(response, 200, { ok: true });
   }
@@ -296,7 +322,7 @@ async function api(request, response) {
 
   if (route === "GET /api/admin") {
     if (!isAdmin(user)) return json(response, 403, { error: "Admin access required." });
-    return json(response, 200, { users: db.users.map(publicUser), events: db.events, badges: db.badges });
+    return json(response, 200, { users: db.users.map(publicUser), events: db.events, badges: db.badges.map((badge) => typeof badge === "string" ? { name: badge, criteriaType: "manual", criteriaCount: 0 } : badge) });
   }
 
   if (route === "POST /api/admin/events") {
@@ -324,7 +350,9 @@ async function api(request, response) {
     const input = await body(request);
     const name = String(input.name ?? "").trim();
     if (!name) return json(response, 400, { error: "Badge name required." });
-    if (!db.badges.includes(name)) db.badges.push(name);
+    const badge = { name, criteriaType: input.criteriaType || "manual", criteriaCount: Number(input.criteriaCount || 0) };
+    if (!db.badges.some((existing) => badgeName(existing) === name)) db.badges.push(badge);
+    if (badge.criteriaType === "connections") for (const candidate of db.users) awardEligibleBadges(db, candidate);
     await writeDb(db);
     return json(response, 200, { badges: db.badges });
   }

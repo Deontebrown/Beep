@@ -12,7 +12,9 @@
         "fullName": "Maya Johnson",
         "photoUrl": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80",
         "industry": "Marketing",
-        "businessType": "Small Business",
+        "businessType": [
+          "Small Business"
+        ],
         "title": "Brand Strategist at Golden Hour Studio",
         "services": [
           "Brand Design",
@@ -51,7 +53,9 @@
         "fullName": "Darius King",
         "photoUrl": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80",
         "industry": "Finance",
-        "businessType": "Established Business",
+        "businessType": [
+          "Established Business"
+        ],
         "title": "CPA and Small Business Advisor",
         "services": [
           "Accounting",
@@ -89,7 +93,9 @@
         "fullName": "Nia Brooks",
         "photoUrl": "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?auto=format&fit=crop&w=300&q=80",
         "industry": "Arts",
-        "businessType": "Minority-Owned Business",
+        "businessType": [
+          "Minority-Owned Business"
+        ],
         "title": "Photographer and Creative Director",
         "services": [
           "Photography",
@@ -130,7 +136,9 @@
         "photoUrl": "https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=300&q=80",
         "age": 35,
         "industry": "Business Services",
-        "businessType": "Established Business",
+        "businessType": [
+          "Established Business"
+        ],
         "title": "Community Operations",
         "services": [
           "Event Planning",
@@ -225,12 +233,40 @@
     }
   ],
   "badges": [
-    "First Connection",
-    "5 Connections",
-    "10 Connections",
-    "Event Regular",
-    "Skill Swapper",
-    "Community Champion",
-    "Prime Connector"
+    {
+      "name": "First Connection",
+      "criteriaType": "connections",
+      "criteriaCount": 1
+    },
+    {
+      "name": "5 Connections",
+      "criteriaType": "connections",
+      "criteriaCount": 5
+    },
+    {
+      "name": "10 Connections",
+      "criteriaType": "connections",
+      "criteriaCount": 10
+    },
+    {
+      "name": "Event Regular",
+      "criteriaType": "manual",
+      "criteriaCount": 0
+    },
+    {
+      "name": "Skill Swapper",
+      "criteriaType": "manual",
+      "criteriaCount": 0
+    },
+    {
+      "name": "Community Champion",
+      "criteriaType": "manual",
+      "criteriaCount": 0
+    },
+    {
+      "name": "Prime Connector",
+      "criteriaType": "connections",
+      "criteriaCount": 100
+    }
   ]
 }
