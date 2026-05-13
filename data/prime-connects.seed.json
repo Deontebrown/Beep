@@ -286,6 +286,20 @@
       "likes": [
         "user_darius",
         "user_nia"
+      ],
+      "comments": [
+        {
+          "id": "comment_seed_1",
+          "authorId": "user_darius",
+          "body": "This is exactly the kind of win Prime Connects was built for. Congrats!",
+          "createdAt": "2026-05-03T15:00:00.000Z"
+        },
+        {
+          "id": "comment_seed_2",
+          "authorId": "user_nia",
+          "body": "Love seeing real collaborations come from the mixer.",
+          "createdAt": "2026-05-03T15:15:00.000Z"
+        }
       ]
     }
   ],

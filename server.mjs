@@ -111,7 +111,7 @@ function awardBadge(db, user, badge) {
   const name = badgeName(badge);
   if (!name || user.badges.includes(name)) return false;
   user.badges.push(name);
-  db.feedPosts.unshift({ id: id("post"), authorId: user.id, type: "BADGE", body: `Earned the ${name} badge through Prime Connects.`, createdAt: new Date().toISOString(), likes: [] });
+  db.feedPosts.unshift({ id: id("post"), authorId: user.id, type: "BADGE", body: `Earned the ${name} badge through Prime Connects.`, createdAt: new Date().toISOString(), likes: [], comments: [] });
   return true;
 }
 
@@ -286,7 +286,7 @@ async function api(request, response) {
     return json(response, 200, { ok: true });
   }
 
-  if (route === "GET /api/feed") return json(response, 200, { posts: db.feedPosts.map((post) => ({ ...post, author: publicUser(db.users.find((candidate) => candidate.id === post.authorId)) })) });
+  if (route === "GET /api/feed") return json(response, 200, { posts: db.feedPosts.map((post) => ({ ...post, comments: (post.comments || []).map((comment) => ({ ...comment, author: publicUser(db.users.find((candidate) => candidate.id === comment.authorId)) })), author: publicUser(db.users.find((candidate) => candidate.id === post.authorId)) })) });
 
   if (route === "POST /api/feed") {
     const input = await body(request);
@@ -294,7 +294,22 @@ async function api(request, response) {
     if (text.length < 8) return json(response, 400, { error: "Share a little more detail about your win." });
     if (/https?:\/\/|www\./i.test(text)) return json(response, 400, { error: "Prime Feed posts cannot include external links or URLs." });
     if (/(fuck|shit|bitch|asshole|nude|nudity|sex|porn|xxx)/i.test(text)) return json(response, 400, { error: "Keep Prime Feed posts professional, safe, and focused on wins and connections." });
-    db.feedPosts.unshift({ id: id("post"), authorId: user.id, type: "WIN", body: text, createdAt: new Date().toISOString(), likes: [] });
+    db.feedPosts.unshift({ id: id("post"), authorId: user.id, type: "WIN", body: text, createdAt: new Date().toISOString(), likes: [], comments: [] });
+    await writeDb(db);
+    return json(response, 200, { ok: true });
+  }
+
+
+  if (route === "POST /api/feed/comment") {
+    const input = await body(request);
+    const post = db.feedPosts.find((item) => item.id === input.postId);
+    if (!post) return json(response, 404, { error: "Feed post not found." });
+    const text = String(input.body ?? "").trim();
+    if (text.length < 1) return json(response, 400, { error: "Comment text required." });
+    if (/https?:\/\/|www\./i.test(text)) return json(response, 400, { error: "Comments cannot include external links or URLs." });
+    if (/(fuck|shit|bitch|asshole|nude|nudity|sex|porn|xxx)/i.test(text)) return json(response, 400, { error: "Keep comments professional and safe." });
+    post.comments = post.comments || [];
+    post.comments.push({ id: id("comment"), authorId: user.id, body: text.slice(0, 500), createdAt: new Date().toISOString() });
     await writeDb(db);
     return json(response, 200, { ok: true });
   }
