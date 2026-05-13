@@ -223,8 +223,32 @@
       "checkedIn": true
     }
   ],
-  "connections": [],
-  "messages": [],
+  "connections": [
+    {
+      "id": "connection_maya_darius",
+      "requesterId": "user_maya",
+      "recipientId": "user_darius",
+      "status": "CONNECTED",
+      "note": "Met at the Prime Summer Mixer and discussed bookkeeping support.",
+      "createdAt": "2026-05-04T15:00:00.000Z"
+    }
+  ],
+  "messages": [
+    {
+      "id": "message_maya_darius_1",
+      "senderId": "user_darius",
+      "receiverId": "user_maya",
+      "body": "Great meeting you at Prime Connects \u2014 your branding work sounds perfect for a few of my clients.",
+      "createdAt": "2026-05-04T16:00:00.000Z"
+    },
+    {
+      "id": "message_maya_darius_2",
+      "senderId": "user_maya",
+      "receiverId": "user_darius",
+      "body": "Likewise! I would love to trade a brand audit for bookkeeping workflow coaching.",
+      "createdAt": "2026-05-04T16:08:00.000Z"
+    }
+  ],
   "feedPosts": [
     {
       "id": "post_seed_win",
