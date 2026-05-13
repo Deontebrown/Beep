@@ -171,6 +171,7 @@
       "emailVerified": true,
       "failedLoginAttempts": 0,
       "lockedUntilReset": false,
+      "isAdmin": true,
       "profileComplete": true,
       "lastSeenAt": "2026-05-13T12:05:00.000Z",
       "profile": {
@@ -317,37 +318,44 @@
     {
       "name": "First Connection",
       "criteriaType": "connections",
-      "criteriaCount": 1
+      "criteriaCount": 1,
+      "iconUrl": ""
     },
     {
       "name": "5 Connections",
       "criteriaType": "connections",
-      "criteriaCount": 5
+      "criteriaCount": 5,
+      "iconUrl": ""
     },
     {
       "name": "10 Connections",
       "criteriaType": "connections",
-      "criteriaCount": 10
+      "criteriaCount": 10,
+      "iconUrl": ""
     },
     {
       "name": "Event Regular",
-      "criteriaType": "manual",
-      "criteriaCount": 0
+      "criteriaType": "events",
+      "criteriaCount": 3,
+      "iconUrl": ""
     },
     {
       "name": "Skill Swapper",
       "criteriaType": "manual",
-      "criteriaCount": 0
+      "criteriaCount": 0,
+      "iconUrl": ""
     },
     {
       "name": "Community Champion",
       "criteriaType": "manual",
-      "criteriaCount": 0
+      "criteriaCount": 0,
+      "iconUrl": ""
     },
     {
       "name": "Prime Connector",
       "criteriaType": "connections",
-      "criteriaCount": 100
+      "criteriaCount": 100,
+      "iconUrl": ""
     }
   ],
   "toolboxDocuments": [

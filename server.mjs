@@ -114,7 +114,7 @@ function onlineStatus(user) {
 }
 
 function isAdmin(user) {
-  return user?.email?.toLowerCase() === "networking@primeconnectsindy.com";
+  return Boolean(user?.isAdmin) || user?.email?.toLowerCase() === "networking@primeconnectsindy.com";
 }
 
 
@@ -124,6 +124,10 @@ function badgeName(badge) {
 
 function connectionCount(db, userId) {
   return db.connections.filter((connection) => connection.requesterId === userId || connection.recipientId === userId).length;
+}
+
+function attendanceCount(db, userId) {
+  return db.attendances.filter((attendance) => attendance.userId === userId && attendance.checkedIn).length;
 }
 
 function awardBadge(db, user, badge) {
@@ -137,7 +141,9 @@ function awardBadge(db, user, badge) {
 function awardEligibleBadges(db, user) {
   for (const badge of db.badges) {
     if (typeof badge === "string") continue;
-    if (badge.criteriaType === "connections" && connectionCount(db, user.id) >= Number(badge.criteriaCount ?? 0)) awardBadge(db, user, badge);
+    const count = Number(badge.criteriaCount ?? 0);
+    if (count > 0 && badge.criteriaType === "connections" && connectionCount(db, user.id) >= count) awardBadge(db, user, badge);
+    if (count > 0 && ["events", "attendances"].includes(badge.criteriaType) && attendanceCount(db, user.id) >= count) awardBadge(db, user, badge);
   }
 }
 
@@ -158,6 +164,10 @@ function isAllowedToolboxDocument(fileName, fileType) {
 function publicUser(user) {
   if (!user) return null;
   return { id: user.id, email: user.email, isAdmin: isAdmin(user), emailVerified: user.emailVerified, profileComplete: user.profileComplete, profile: user.profile, badges: user.badges ?? [], onlineStatus: onlineStatus(user) };
+}
+
+function publicBadges(db) {
+  return (db.badges || []).map((badge) => typeof badge === "string" ? { name: badge, criteriaType: "manual", criteriaCount: 0, iconUrl: "" } : { name: badge.name, criteriaType: badge.criteriaType || "manual", criteriaCount: Number(badge.criteriaCount || 0), iconUrl: badge.iconUrl || "" });
 }
 
 function tokenSet(value) {
@@ -213,7 +223,7 @@ async function api(request, response) {
     if (!email.includes("@") || password.length < 8) return json(response, 400, { error: "Use a valid email and a password with 8+ characters." });
     if (db.users.some((user) => user.email === email)) return json(response, 409, { error: "An account with this email already exists." });
     const verificationToken = randomBytes(24).toString("hex");
-    db.users.push({ id: id("user"), email, passwordHash: hashPassword(password), emailVerified: false, verificationToken, failedLoginAttempts: 0, lockedUntilReset: false, profileComplete: false, profile: null, badges: [], lastSeenAt: null });
+    db.users.push({ id: id("user"), email, passwordHash: hashPassword(password), emailVerified: false, verificationToken, failedLoginAttempts: 0, lockedUntilReset: false, profileComplete: false, profile: null, badges: [], isAdmin: false, lastSeenAt: null });
     await writeDb(db);
     return json(response, 200, { verificationToken });
   }
@@ -291,7 +301,8 @@ async function api(request, response) {
     const existing = db.attendances.find((attendance) => attendance.userId === user.id && attendance.eventId === input.eventId);
     if (existing) existing.checkedIn = true;
     else db.attendances.push({ userId: user.id, eventId: input.eventId, checkedIn: true });
-    if (db.attendances.filter((attendance) => attendance.userId === user.id && attendance.checkedIn).length >= 3 && !user.badges.includes("Event Regular")) user.badges.push("Event Regular");
+    if (attendanceCount(db, user.id) >= 3 && !user.badges.includes("Event Regular")) user.badges.push("Event Regular");
+    awardEligibleBadges(db, user);
     await writeDb(db);
     return json(response, 200, { ok: true });
   }
@@ -364,6 +375,10 @@ async function api(request, response) {
     return json(response, 200, { ok: true });
   }
 
+  if (route === "GET /api/badges") {
+    return json(response, 200, { badges: publicBadges(db) });
+  }
+
   if (route === "GET /api/toolbox") {
     return json(response, 200, { documents: db.toolboxDocuments || [] });
   }
@@ -387,7 +402,7 @@ async function api(request, response) {
 
   if (route === "GET /api/admin") {
     if (!isAdmin(user)) return json(response, 403, { error: "Admin access required." });
-    return json(response, 200, { users: db.users.map(publicUser), events: db.events, badges: db.badges.map((badge) => typeof badge === "string" ? { name: badge, criteriaType: "manual", criteriaCount: 0 } : badge), toolboxDocuments: db.toolboxDocuments || [] });
+    return json(response, 200, { users: db.users.map(publicUser), events: db.events, badges: publicBadges(db), toolboxDocuments: db.toolboxDocuments || [] });
   }
 
   if (route === "POST /api/admin/events/delete") {
@@ -425,12 +440,40 @@ async function api(request, response) {
     if (!isAdmin(user)) return json(response, 403, { error: "Admin access required." });
     const input = await body(request);
     const name = String(input.name ?? "").trim();
+    const originalName = String(input.originalName ?? "").trim();
     if (!name) return json(response, 400, { error: "Badge name required." });
-    const badge = { name, criteriaType: input.criteriaType || "manual", criteriaCount: Number(input.criteriaCount || 0) };
-    if (!db.badges.some((existing) => badgeName(existing) === name)) db.badges.push(badge);
-    if (badge.criteriaType === "connections") for (const candidate of db.users) awardEligibleBadges(db, candidate);
+    const badge = { name, criteriaType: input.criteriaType || "manual", criteriaCount: Number(input.criteriaCount || 0), iconUrl: String(input.iconUrl ?? "") };
+    const existingIndex = db.badges.findIndex((existing) => badgeName(existing) === (originalName || name));
+    if (existingIndex >= 0) {
+      const previousName = badgeName(db.badges[existingIndex]);
+      db.badges[existingIndex] = badge;
+      if (previousName !== name) for (const candidate of db.users) candidate.badges = (candidate.badges || []).map((item) => item === previousName ? name : item);
+    } else if (!db.badges.some((existing) => badgeName(existing) === name)) db.badges.push(badge);
+    for (const candidate of db.users) awardEligibleBadges(db, candidate);
     await writeDb(db);
-    return json(response, 200, { badges: db.badges });
+    return json(response, 200, { badges: publicBadges(db) });
+  }
+
+  if (route === "POST /api/admin/badges/assign") {
+    if (!isAdmin(user)) return json(response, 403, { error: "Admin access required." });
+    const input = await body(request);
+    const target = db.users.find((candidate) => candidate.id === input.userId);
+    const badge = db.badges.find((candidate) => badgeName(candidate) === input.badgeName);
+    if (!target || !badge) return json(response, 400, { error: "Choose a valid user and badge." });
+    awardBadge(db, target, badge);
+    await writeDb(db);
+    return json(response, 200, { ok: true });
+  }
+
+  if (route === "POST /api/admin/users/admin") {
+    if (!isAdmin(user)) return json(response, 403, { error: "Admin access required." });
+    const input = await body(request);
+    if (input.userId === user.id && input.isAdmin === false) return json(response, 400, { error: "Admins cannot remove their own admin access." });
+    const target = db.users.find((candidate) => candidate.id === input.userId);
+    if (!target) return json(response, 404, { error: "User not found." });
+    target.isAdmin = Boolean(input.isAdmin);
+    await writeDb(db);
+    return json(response, 200, { user: publicUser(target) });
   }
 
   if (route === "POST /api/admin/users/remove") {
