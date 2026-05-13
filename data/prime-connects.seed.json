@@ -34,7 +34,13 @@
         ],
         "socialLinks": "@goldenhourstudio",
         "bio": "Helping Indianapolis founders build memorable brands.",
-        "age": 32
+        "age": 32,
+        "portfolioImages": [
+          "https://images.unsplash.com/photo-1558655146-d09347e92766?auto=format&fit=crop&w=400&q=80",
+          "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?auto=format&fit=crop&w=400&q=80",
+          "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=400&q=80",
+          "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=400&q=80"
+        ]
       },
       "badges": [
         "First Connection"
@@ -74,7 +80,11 @@
         ],
         "socialLinks": "linkedin.com/in/dariusking",
         "bio": "Making finances less intimidating for growing businesses.",
-        "age": 39
+        "age": 39,
+        "portfolioImages": [
+          "https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=400&q=80",
+          "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=400&q=80"
+        ]
       },
       "badges": [
         "Event Regular"
@@ -115,7 +125,12 @@
         ],
         "socialLinks": "@niabrookscreates",
         "bio": "Creating visuals that make community stories impossible to ignore.",
-        "age": 29
+        "age": 29,
+        "portfolioImages": [
+          "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=400&q=80",
+          "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=400&q=80",
+          "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=400&q=80"
+        ]
       },
       "badges": [
         "Skill Swapper"
@@ -156,7 +171,8 @@
           "Food"
         ],
         "socialLinks": "networking@PrimeConnectsIndy.com",
-        "bio": "Prime Connects operations and event management."
+        "bio": "Prime Connects operations and event management.",
+        "portfolioImages": []
       },
       "badges": [
         "Prime Connector"

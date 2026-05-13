@@ -6,6 +6,8 @@ const state = {
   data: { events: [], connections: [], feed: [], messages: [], swaps: [], admin: null },
   selectedEvent: null,
   selectedThread: null,
+  selectedProfileId: null,
+  previousTab: "home",
   authMode: "signup",
   verificationToken: null,
   onboardingStep: 0,
@@ -60,6 +62,20 @@ function readFileAsDataUrl(file) { return new Promise((resolve, reject) => { con
 function fileInput(id, label, accept) { return `<label class="field upload-field">${label}<input id="${id}" type="file" accept="${accept}"></label>`; }
 function flyerPreview(event) { if (!event?.flyerUrl) return ""; return String(event.flyerUrl).startsWith("data:application/pdf") ? `<a class="flyer pdf-flyer" href="${esc(event.flyerUrl)}" target="_blank" rel="noopener">Open event flyer PDF</a>` : `<img class="flyer" src="${esc(event.flyerUrl)}" alt="${esc(event.name)} flyer">`; }
 function setStatus(message) { state.status = message; const node = document.querySelector(".status"); if (node) node.textContent = message; }
+
+function titleParts(title = "") { const parts = String(title).split(/\s+at\s+/i); return { title: parts[0] || title, company: parts.slice(1).join(" at ") }; }
+function profilePortfolio(profile) { return (profile?.portfolioImages || []).slice(0, 4); }
+function businessTypeText(value) { return asArray(value).join(", "); }
+function findPublicProfile(userId) {
+  for (const event of state.data.events) {
+    const attendee = event.attendees.find((item) => item.id === userId);
+    if (attendee) return attendee;
+  }
+  const connection = state.data.connections.find((item) => item.user.id === userId);
+  if (connection?.user?.profile) return { id: connection.user.id, ...connection.user.profile, badges: connection.user.badges || [], onlineStatus: connection.user.onlineStatus, connected: true, matchScore: null };
+  return null;
+}
+function openProfile(userId) { state.selectedProfileId = userId; state.previousTab = state.tab === "profile" ? state.previousTab : state.tab; state.tab = "profile"; render(); }
 
 async function init() {
   const me = await api("/api/me");
@@ -172,15 +188,25 @@ function renderApp() {
   document.querySelector("[data-home]").onclick = () => { state.tab = "home"; render(); };
   bindScreen();
 }
-function screen() { return ({ home: homeScreen, events: eventsScreen, connections: connectionsScreen, messages: messagesScreen, feed: feedScreen, account: accountScreen, admin: adminScreen })[state.tab](); }
+function screen() { return ({ home: homeScreen, events: eventsScreen, connections: connectionsScreen, messages: messagesScreen, feed: feedScreen, account: accountScreen, admin: adminScreen, profile: profileScreen })[state.tab](); }
 function homeScreen() { return `<section class="screen"><div class="profile compact">${avatar(state.user.profile)}<h2>Welcome, ${esc(state.user.profile.fullName.split(" ")[0])}</h2><p>${esc(state.user.profile.title)}</p></div><div class="home-grid"><button class="event-card" data-tab="events"><span>Next step</span><strong>Find an event</strong><small>RSVP and see AI matches.</small></button><button class="event-card" data-tab="connections"><span>Network</span><strong>${state.data.connections.length} connections</strong><small>Follow up with private notes.</small></button><button class="event-card" data-tab="feed"><span>Community</span><strong>Prime Feed</strong><small>Share wins and connection stories.</small></button></div><h3>Upcoming</h3>${state.data.events.slice(0, 2).map(eventSummary).join("")}</section>`; }
 function eventSummary(item) { return `<article class="event-card"><span>${new Date(item.date).toLocaleDateString([], { month: "short", day: "numeric" })}</span><strong>${esc(item.name)}</strong><small>${esc(item.location)}</small></article>`; }
 function eventsScreen() {
   const event = state.data.events.find((item) => item.id === state.selectedEvent) || state.data.events[0];
   return `<section class="screen"><h2>Upcoming Events</h2><div class="stack">${state.data.events.map((item) => `<button class="event-card" data-event="${item.id}"><span>${new Date(item.date).toLocaleDateString([], { month: "short", day: "numeric" })}</span><strong>${esc(item.name)}</strong><small>${esc(item.location)}</small></button>`).join("")}</div>${event ? `<div class="detail">${flyerPreview(event)}<p class="eyebrow">Event detail</p><h3>${esc(event.name)}</h3><p>${esc(event.description)}</p><p><strong>Dress code:</strong> ${esc(event.dressCode)}</p><button class="primary" id="rsvp">I'll be there</button>${event.pendingMatches ? `<div class="pending">✦ Pending — Waiting for More Attendees</div>` : ""}<h4>AI-ranked attendees</h4>${event.attendees.map(memberCard).join("")}</div>` : ""}</section>`;
 }
-function memberCard(attendee) { return `<article class="member">${avatar(attendee)}<div><div class="member-head"><strong>${esc(attendee.fullName)} ${onlineDot(attendee.onlineStatus)}</strong><span>${attendee.connected ? "✓ Connected" : `${attendee.matchScore}%`}</span></div><p>${esc(attendee.title)} · ${esc(attendee.industry)}</p><small>${esc(attendee.businessType)}</small>${tags(attendee.lookingFor)}${attendee.connected ? `<div class="connected-pill">✓ Connected</div>` : `<input data-note="${attendee.id}" placeholder="Private note: where you met / follow-up"><button class="mini" data-connect="${attendee.id}">🤝 Connect</button>`}</div></article>`; }
-function connectionsScreen() { const top = state.data.events.flatMap((event) => event.attendees).sort((a, b) => b.matchScore - a.matchScore).slice(0, 5); return `<section class="screen"><h2>Connections</h2><p>Browse top AI-matched attendees, connect, and save private context notes.</p><h3>Top matches</h3>${top.map(memberCard).join("")}<h3>Your network</h3>${state.data.connections.map((connection) => `<article class="row thread-row" data-thread="${connection.user.id}">${avatar(connection.user.profile)}<div><strong>${esc(connection.user.profile?.fullName)} ${onlineDot(connection.user.onlineStatus)}</strong><p>${esc(connection.note || "No note yet.")}</p></div><span class="connected-pill">✓ Connected</span></article>`).join("") || "<p>No connections yet.</p>"}</section>`; }
+function memberCard(attendee) { const parts = titleParts(attendee.title); return `<article class="member profile-click" data-profile="${attendee.id}">${avatar(attendee)}<div><div class="member-head"><strong>${esc(attendee.fullName)} ${onlineDot(attendee.onlineStatus)}</strong><span>${attendee.connected ? "✓ Connected" : `${attendee.matchScore}%`}</span></div><p>${esc(parts.title)}${parts.company ? ` · ${esc(parts.company)}` : ""} · ${esc(attendee.industry)}</p><small>${esc(businessTypeText(attendee.businessType))}</small>${tags(attendee.lookingFor)}${attendee.connected ? `<div class="connected-pill">✓ Connected</div>` : `<input data-note="${attendee.id}" placeholder="Private note: where you met / follow-up"><button class="mini" data-connect="${attendee.id}">🤝 Connect</button>`}</div></article>`; }
+function connectionsScreen() { const top = state.data.events.flatMap((event) => event.attendees).sort((a, b) => b.matchScore - a.matchScore).slice(0, 5); return `<section class="screen"><h2>Connections</h2><p>Browse top AI-matched attendees, connect, and save private context notes.</p><h3>Top matches</h3>${top.map(memberCard).join("")}<h3>Your network</h3>${state.data.connections.map((connection) => `<article class="row thread-row profile-click" data-profile="${connection.user.id}">${avatar(connection.user.profile)}<div><strong>${esc(connection.user.profile?.fullName)} ${onlineDot(connection.user.onlineStatus)}</strong><p>${esc(connection.note || "No note yet.")}</p></div><span class="connected-pill">✓ Connected</span></article>`).join("") || "<p>No connections yet.</p>"}</section>`; }
+
+function profileScreen() {
+  const member = findPublicProfile(state.selectedProfileId);
+  if (!member) return `<section class="screen"><button class="secondary" id="backFromProfile">Back</button><p>Profile not found.</p></section>`;
+  const parts = titleParts(member.title);
+  const images = profilePortfolio(member);
+  const socialLinks = String(member.socialLinks || "").split(/[\n,]+/).map((item) => item.trim()).filter(Boolean);
+  return `<section class="screen"><button class="secondary" id="backFromProfile">Back</button><article class="public-profile-card"><div class="public-profile-top">${avatar(member)}<div><h2>${esc(member.fullName)}</h2><p>${esc(parts.title)}</p>${parts.company ? `<strong>${esc(parts.company)}</strong>` : ""}</div></div><div class="profile-meta-row">${member.matchScore === null || member.matchScore === undefined ? "" : `<span class="match-pill">${member.matchScore}% match</span>`}${member.connected ? `<span class="connected-pill">✓ Connected</span>` : ""}${onlineDot(member.onlineStatus)}</div><div class="profile-section"><h3>Badges</h3><div class="badge-grid compact-badges">${(member.badges || []).map((badge) => `<div>🏆 ${esc(badge)}</div>`).join("") || "<p>No badges yet.</p>"}</div></div><div class="profile-section"><h3>Business</h3><p><strong>Business type:</strong> ${esc(businessTypeText(member.businessType) || "Not listed")}</p><p><strong>Industry:</strong> ${esc(member.industry || "Not listed")}</p></div><div class="profile-section"><h3>Skills & Services</h3>${tags(member.services)}</div><div class="profile-section"><h3>Looking For</h3>${tags(member.lookingFor)}</div>${images.length ? `<div class="profile-section"><h3>Portfolio / Work Examples</h3><div class="portfolio-grid">${images.map((image, index) => `<img src="${esc(image)}" alt="${esc(member.fullName)} work example ${index + 1}">`).join("")}</div></div>` : ""}${socialLinks.length ? `<div class="profile-section"><h3>Social Links</h3><div class="social-list">${socialLinks.map((link) => `<span>${esc(link)}</span>`).join("")}</div></div>` : ""}</article></section>`;
+}
+
 function messagesScreen() {
   const selected = state.data.connections.find((connection) => connection.user.id === state.selectedThread) || state.data.connections[0];
   const threadMessages = selected ? state.data.messages.filter((message) => [message.senderId, message.receiverId].includes(selected.user.id)) : [];
@@ -198,6 +224,8 @@ function adminScreen() {
 }
 function bindScreen() {
   document.querySelectorAll("[data-event]").forEach((button) => button.onclick = () => { state.selectedEvent = button.dataset.event; render(); });
+  document.querySelectorAll("[data-profile]").forEach((item) => item.onclick = (event) => { if (event.target.closest("[data-connect], [data-note], input, button")) return; openProfile(item.dataset.profile); });
+  document.querySelector("#backFromProfile")?.addEventListener("click", () => { state.tab = state.previousTab || "connections"; render(); });
   document.querySelector("#rsvp")?.addEventListener("click", async () => { const event = state.data.events.find((item) => item.id === state.selectedEvent); await api("/api/events/check-in", { method: "POST", body: JSON.stringify({ eventId: state.selectedEvent }) }); await loadAppData(); render(); if (event?.rsvpUrl) window.open(event.rsvpUrl, "_blank", "noopener"); });
   document.querySelectorAll("[data-connect]").forEach((button) => button.onclick = async () => { const recipientId = button.dataset.connect; const note = document.querySelector(`[data-note="${recipientId}"]`)?.value || ""; await api("/api/connections", { method: "POST", body: JSON.stringify({ recipientId, note }) }); await loadAppData(); render(); });
   document.querySelectorAll("[data-thread]").forEach((button) => button.onclick = () => { state.selectedThread = button.dataset.thread; state.tab = "messages"; render(); });
