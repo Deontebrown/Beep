@@ -240,7 +240,7 @@ async function api(request, response) {
     const input = await body(request);
     if (!completeRequired([input.fullName, input.photoUrl, input.age ?? user.profile?.age, input.industry, input.businessType, input.title, input.services, input.lookingFor, input.interests])) return json(response, 400, { error: "Complete all required profile fields." });
     const existingAge = user.profile?.age;
-    user.profile = { fullName: input.fullName, photoUrl: input.photoUrl, age: existingAge ?? input.age, industry: input.industry, businessType: normalizeBusinessTypes(input.businessType), title: input.title, services: input.services, lookingFor: input.lookingFor, interests: input.interests, socialLinks: input.socialLinks ?? "", bio: input.bio ?? "", userId: user.id };
+    user.profile = { fullName: input.fullName, photoUrl: input.photoUrl, age: existingAge ?? input.age, industry: input.industry, businessType: normalizeBusinessTypes(input.businessType), title: input.title, services: input.services, lookingFor: input.lookingFor, interests: input.interests, socialLinks: input.socialLinks ?? "", bio: input.bio ?? "", portfolioItems: (input.portfolioItems ?? user.profile?.portfolioItems ?? []).slice(0, 4), userId: user.id };
     user.profileComplete = true;
     await writeDb(db);
     return json(response, 200, { user: publicUser(user) });
