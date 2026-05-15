@@ -52,3 +52,25 @@ New users can sign up and then press the in-app **Verify email and continue** bu
 ```bash
 npm run check
 ```
+
+## Expo / React Native mobile app
+
+A first Expo mobile client lives in `mobile/`. It reuses the existing Node API, so run the backend first:
+
+```bash
+npm run dev
+```
+
+In a second terminal, start Expo:
+
+```bash
+npm run mobile
+```
+
+For Expo Go on a physical device, set the API URL to your computer's LAN IP instead of `localhost`:
+
+```bash
+EXPO_PUBLIC_API_URL="http://YOUR-LAN-IP:3000" npm run mobile
+```
+
+The mobile app includes the core member experience: login, home, events/check-in, connections, messages, feed, toolbox browsing, account logout, and an admin dashboard summary. Detailed admin file uploads and document editing remain available in the web admin console.

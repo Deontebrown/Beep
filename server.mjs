@@ -94,13 +94,21 @@ function parseCookies(request) {
   }));
 }
 
-function sessionUserId(request) {
-  const token = parseCookies(request)[SESSION_COOKIE];
+function tokenUserId(token) {
   if (!token) return null;
   const parts = token.split(".");
   if (parts.length !== 3) return null;
   const payload = `${parts[0]}.${parts[1]}`;
   return sign(payload) === parts[2] ? parts[0] : null;
+}
+
+function sessionUserId(request) {
+  return tokenUserId(parseCookies(request)[SESSION_COOKIE]);
+}
+
+function bearerUserId(request) {
+  const header = request.headers.authorization || "";
+  return header.startsWith("Bearer ") ? tokenUserId(header.slice(7)) : null;
 }
 
 function json(response, status, body, headers = {}) {
@@ -204,7 +212,7 @@ function scoreMatch(viewer, candidate, db) {
 }
 
 function authUser(request, db) {
-  const userId = sessionUserId(request);
+  const userId = sessionUserId(request) || bearerUserId(request);
   return db.users.find((user) => user.id === userId) ?? null;
 }
 
@@ -246,7 +254,8 @@ async function api(request, response) {
     user.verificationToken = null;
     user.lastSeenAt = new Date().toISOString();
     await writeDb(db);
-    return json(response, 200, { user: publicUser(user) }, { "set-cookie": `${SESSION_COOKIE}=${sessionToken(user.id)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800` });
+    const authToken = sessionToken(user.id);
+    return json(response, 200, { user: publicUser(user), authToken }, { "set-cookie": `${SESSION_COOKIE}=${authToken}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800` });
   }
 
   if (route === "POST /api/auth/login") {
@@ -264,7 +273,8 @@ async function api(request, response) {
     user.failedLoginAttempts = 0;
     user.lastSeenAt = new Date().toISOString();
     await writeDb(db);
-    return json(response, 200, { user: publicUser(user) }, { "set-cookie": `${SESSION_COOKIE}=${sessionToken(user.id)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800` });
+    const authToken = sessionToken(user.id);
+    return json(response, 200, { user: publicUser(user), authToken }, { "set-cookie": `${SESSION_COOKIE}=${authToken}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800` });
   }
 
   if (route === "POST /api/auth/forgot-password") {
