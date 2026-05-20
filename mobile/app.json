@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "Prime Connects",
+    "slug": "prime-connects",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "primeconnects",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.primeconnects.app"
+    },
+    "android": {
+      "package": "com.primeconnects.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#1A1A1A"
+      }
+    },
+    "extra": {
+      "apiUrl": "http://localhost:3000"
+    }
+  }
+}

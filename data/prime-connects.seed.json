@@ -1,0 +1,387 @@
+{
+  "users": [
+    {
+      "id": "user_maya",
+      "email": "maya@primeconnects.test",
+      "passwordHash": "demo",
+      "emailVerified": true,
+      "failedLoginAttempts": 0,
+      "lockedUntilReset": false,
+      "termsAccepted": true,
+      "profileComplete": true,
+      "profile": {
+        "fullName": "Maya Johnson",
+        "photoUrl": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80",
+        "industry": "Marketing",
+        "businessType": [
+          "Small Business"
+        ],
+        "title": "Brand Strategist at Golden Hour Studio",
+        "services": [
+          "Brand Design",
+          "Social Media",
+          "Content Creation"
+        ],
+        "lookingFor": [
+          "Clients",
+          "Collaborators",
+          "Community Connections"
+        ],
+        "interests": [
+          "Music",
+          "Food",
+          "Community",
+          "Art"
+        ],
+        "socialLinks": "@goldenhourstudio",
+        "bio": "Helping Indianapolis founders build memorable brands.",
+        "age": 32,
+        "portfolioItems": [
+          {
+            "image": "https://images.unsplash.com/photo-1558655146-d09347e92766?auto=format&fit=crop&w=400&q=80",
+            "description": "Restaurant rebrand concept"
+          },
+          {
+            "image": "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?auto=format&fit=crop&w=400&q=80",
+            "description": "Social media launch plan"
+          },
+          {
+            "image": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=400&q=80",
+            "description": "Founder website landing page"
+          },
+          {
+            "image": "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=400&q=80",
+            "description": "Community campaign creative"
+          }
+        ]
+      },
+      "badges": [
+        "First Connection"
+      ],
+      "lastSeenAt": "2026-05-13T12:00:00.000Z"
+    },
+    {
+      "id": "user_darius",
+      "email": "darius@primeconnects.test",
+      "passwordHash": "demo",
+      "emailVerified": true,
+      "failedLoginAttempts": 0,
+      "lockedUntilReset": false,
+      "termsAccepted": true,
+      "profileComplete": true,
+      "profile": {
+        "fullName": "Darius King",
+        "photoUrl": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80",
+        "industry": "Finance",
+        "businessType": [
+          "Established Business"
+        ],
+        "title": "CPA and Small Business Advisor",
+        "services": [
+          "Accounting",
+          "Funding Strategy",
+          "Business Coaching"
+        ],
+        "lookingFor": [
+          "Clients",
+          "Vendors",
+          "Skill Swaps"
+        ],
+        "interests": [
+          "Sports",
+          "Community",
+          "Youth Leadership"
+        ],
+        "socialLinks": "linkedin.com/in/dariusking",
+        "bio": "Making finances less intimidating for growing businesses.",
+        "age": 39,
+        "portfolioItems": [
+          {
+            "image": "https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=400&q=80",
+            "description": "Small business finance dashboard"
+          },
+          {
+            "image": "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=400&q=80",
+            "description": "Quarterly growth analysis"
+          }
+        ]
+      },
+      "badges": [
+        "Event Regular"
+      ],
+      "lastSeenAt": "2026-05-13T11:45:00.000Z"
+    },
+    {
+      "id": "user_nia",
+      "email": "nia@primeconnects.test",
+      "passwordHash": "demo",
+      "emailVerified": true,
+      "failedLoginAttempts": 0,
+      "lockedUntilReset": false,
+      "termsAccepted": true,
+      "profileComplete": true,
+      "profile": {
+        "fullName": "Nia Brooks",
+        "photoUrl": "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?auto=format&fit=crop&w=300&q=80",
+        "industry": "Arts",
+        "businessType": [
+          "Minority-Owned Business"
+        ],
+        "title": "Photographer and Creative Director",
+        "services": [
+          "Photography",
+          "Content Creation",
+          "Event Planning"
+        ],
+        "lookingFor": [
+          "Clients",
+          "Collaborators",
+          "Mentors"
+        ],
+        "interests": [
+          "Art",
+          "Travel",
+          "Music",
+          "Food"
+        ],
+        "socialLinks": "@niabrookscreates",
+        "bio": "Creating visuals that make community stories impossible to ignore.",
+        "age": 29,
+        "portfolioItems": [
+          {
+            "image": "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=400&q=80",
+            "description": "Editorial portrait session"
+          },
+          {
+            "image": "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=400&q=80",
+            "description": "Community brand shoot"
+          },
+          {
+            "image": "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=400&q=80",
+            "description": "Event photography sample"
+          }
+        ]
+      },
+      "badges": [
+        "Skill Swapper"
+      ],
+      "lastSeenAt": "2026-05-12T18:00:00.000Z"
+    },
+    {
+      "id": "user_admin",
+      "email": "networking@primeconnectsindy.com",
+      "passwordHash": "demo",
+      "emailVerified": true,
+      "failedLoginAttempts": 0,
+      "lockedUntilReset": false,
+      "isAdmin": true,
+      "termsAccepted": true,
+      "profileComplete": true,
+      "lastSeenAt": "2026-05-13T12:05:00.000Z",
+      "profile": {
+        "fullName": "Prime Connects Admin",
+        "photoUrl": "https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=300&q=80",
+        "age": 35,
+        "industry": "Business Services",
+        "businessType": [
+          "Established Business"
+        ],
+        "title": "Community Operations",
+        "services": [
+          "Event Planning",
+          "Business Coaching",
+          "Community Connections"
+        ],
+        "lookingFor": [
+          "Community Connections",
+          "Collaborators",
+          "Vendors"
+        ],
+        "interests": [
+          "Community",
+          "Youth Leadership",
+          "Food"
+        ],
+        "socialLinks": "networking@PrimeConnectsIndy.com",
+        "bio": "Prime Connects operations and event management.",
+        "portfolioItems": []
+      },
+      "badges": [
+        "Prime Connector"
+      ]
+    }
+  ],
+  "events": [
+    {
+      "id": "event_summer_mixer",
+      "name": "Prime Summer Mixer",
+      "date": "2026-06-20T22:30:00.000Z",
+      "location": "Bottleworks District \u00b7 Indianapolis, IN",
+      "description": "A polished evening for entrepreneurs, creatives, and corporate partners to make intentional high-value connections.",
+      "dressCode": "Business elevated / cocktail casual",
+      "flyerUrl": "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=900&q=80",
+      "rsvpUrl": "https://primeconnectsindy.com/events/summer-mixer"
+    },
+    {
+      "id": "event_next_leaders",
+      "name": "Next Leaders Networking Night",
+      "date": "2026-07-11T21:00:00.000Z",
+      "location": "16 Tech Innovation District \u00b7 Indianapolis, IN",
+      "description": "A youth and emerging leader networking experience built around mentorship, community, and practical follow-up.",
+      "dressCode": "Smart casual",
+      "flyerUrl": "https://images.unsplash.com/photo-1517048676732-d65bc937f952?auto=format&fit=crop&w=900&q=80",
+      "rsvpUrl": "https://primeconnectsindy.com/events/next-leaders"
+    }
+  ],
+  "attendances": [
+    {
+      "userId": "user_maya",
+      "eventId": "event_summer_mixer",
+      "checkedIn": true
+    },
+    {
+      "userId": "user_darius",
+      "eventId": "event_summer_mixer",
+      "checkedIn": true
+    },
+    {
+      "userId": "user_nia",
+      "eventId": "event_summer_mixer",
+      "checkedIn": true
+    },
+    {
+      "userId": "user_nia",
+      "eventId": "event_next_leaders",
+      "checkedIn": true
+    }
+  ],
+  "connections": [
+    {
+      "id": "connection_maya_darius",
+      "requesterId": "user_maya",
+      "recipientId": "user_darius",
+      "status": "CONNECTED",
+      "note": "Met at the Prime Summer Mixer and discussed bookkeeping support.",
+      "createdAt": "2026-05-04T15:00:00.000Z"
+    }
+  ],
+  "messages": [
+    {
+      "id": "message_maya_darius_1",
+      "senderId": "user_darius",
+      "receiverId": "user_maya",
+      "body": "Great meeting you at Prime Connects \u2014 your branding work sounds perfect for a few of my clients.",
+      "createdAt": "2026-05-04T16:00:00.000Z"
+    },
+    {
+      "id": "message_maya_darius_2",
+      "senderId": "user_maya",
+      "receiverId": "user_darius",
+      "body": "Likewise! I would love to trade a brand audit for bookkeeping workflow coaching.",
+      "createdAt": "2026-05-04T16:08:00.000Z"
+    }
+  ],
+  "feedPosts": [
+    {
+      "id": "post_seed_win",
+      "authorId": "user_maya",
+      "type": "WIN",
+      "body": "Closed a new restaurant branding project after meeting the owner at a Prime Connects mixer.",
+      "createdAt": "2026-05-03T14:00:00.000Z",
+      "likes": [
+        "user_darius",
+        "user_nia"
+      ],
+      "comments": [
+        {
+          "id": "comment_seed_1",
+          "authorId": "user_darius",
+          "body": "This is exactly the kind of win Prime Connects was built for. Congrats!",
+          "createdAt": "2026-05-03T15:00:00.000Z"
+        },
+        {
+          "id": "comment_seed_2",
+          "authorId": "user_nia",
+          "body": "Love seeing real collaborations come from the mixer.",
+          "createdAt": "2026-05-03T15:15:00.000Z"
+        }
+      ]
+    }
+  ],
+  "skillSwaps": [
+    {
+      "id": "swap_maya",
+      "userId": "user_maya",
+      "offering": "a brand audit and social content plan",
+      "seeking": "bookkeeping workflow coaching",
+      "completed": false,
+      "createdAt": "2026-05-03T14:00:00.000Z"
+    }
+  ],
+  "badges": [
+    {
+      "name": "First Connection",
+      "criteriaType": "connections",
+      "criteriaCount": 1,
+      "iconUrl": ""
+    },
+    {
+      "name": "5 Connections",
+      "criteriaType": "connections",
+      "criteriaCount": 5,
+      "iconUrl": ""
+    },
+    {
+      "name": "10 Connections",
+      "criteriaType": "connections",
+      "criteriaCount": 10,
+      "iconUrl": ""
+    },
+    {
+      "name": "Event Regular",
+      "criteriaType": "events",
+      "criteriaCount": 3,
+      "iconUrl": ""
+    },
+    {
+      "name": "Skill Swapper",
+      "criteriaType": "manual",
+      "criteriaCount": 0,
+      "iconUrl": ""
+    },
+    {
+      "name": "Community Champion",
+      "criteriaType": "manual",
+      "criteriaCount": 0,
+      "iconUrl": ""
+    },
+    {
+      "name": "Prime Connector",
+      "criteriaType": "connections",
+      "criteriaCount": 100,
+      "iconUrl": ""
+    }
+  ],
+  "toolboxDocuments": [
+    {
+      "id": "doc_marketing_plan",
+      "title": "Marketing Campaign Planner",
+      "category": "Marketing",
+      "description": "A simple planning worksheet for launch campaigns.",
+      "fileName": "marketing-campaign-planner.pdf",
+      "fileType": "application/pdf",
+      "fileData": "data:application/pdf;base64,JVBERi0xLjQKJVBSSU1FIENPTk5FQ1RTIE1BUktFVElORyBQTElBTk5FUgo=",
+      "createdAt": "2026-05-03T16:00:00.000Z"
+    },
+    {
+      "id": "doc_startup_checklist",
+      "title": "Startup Launch Checklist",
+      "category": "Starting Up",
+      "description": "Checklist for early-stage business setup tasks.",
+      "fileName": "startup-launch-checklist.docx",
+      "fileType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "fileData": "data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,UEsDBBQABgAIAAAAIQ==",
+      "createdAt": "2026-05-03T16:05:00.000Z"
+    }
+  ]
+}
