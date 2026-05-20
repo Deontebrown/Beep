@@ -48,7 +48,8 @@ async function readDb() {
 }
 
 function normalizeDb(db) {
-  for (const key of ["users", "events", "attendances", "connections", "messages", "feedPosts", "skillSwaps", "badges", "toolboxDocuments"]) db[key] ||= [];
+  for (const key of ["users", "events", "attendances", "connections", "messages", "feedPosts", "skillSwaps", "badges", "toolboxDocuments", "ads"]) db[key] ||= [];
+  db.adSettings ||= { frequency: 4 };
   for (const user of db.users) {
     user.badges ||= [];
     user.isAdmin = Boolean(user.isAdmin) || user.email?.toLowerCase() === "networking@primeconnectsindy.com";
@@ -377,7 +378,7 @@ async function api(request, response) {
     return json(response, 200, { ok: true });
   }
 
-  if (route === "GET /api/feed") return json(response, 200, { posts: db.feedPosts.map((post) => ({ ...post, comments: (post.comments || []).map((comment) => ({ ...comment, author: publicUser(db.users.find((candidate) => candidate.id === comment.authorId && !candidate.deactivated)) })), author: publicUser(db.users.find((candidate) => candidate.id === post.authorId && !candidate.deactivated)) })) });
+  if (route === "GET /api/feed") return json(response, 200, { posts: db.feedPosts.map((post) => ({ ...post, comments: (post.comments || []).map((comment) => ({ ...comment, author: publicUser(db.users.find((candidate) => candidate.id === comment.authorId && !candidate.deactivated)) })), author: publicUser(db.users.find((candidate) => candidate.id === post.authorId && !candidate.deactivated)) })), ads: db.ads || [], adSettings: db.adSettings || { frequency: 4 } });
 
   if (route === "POST /api/feed") {
     const input = await body(request);
@@ -511,7 +512,14 @@ async function api(request, response) {
 
   if (route === "GET /api/admin") {
     if (!isAdmin(user)) return json(response, 403, { error: "Admin access required." });
-    return json(response, 200, { users: db.users.map(publicUser), events: db.events, badges: publicBadges(db), toolboxDocuments: db.toolboxDocuments || [] });
+    return json(response, 200, { users: db.users.map(publicUser), events: db.events, badges: publicBadges(db), toolboxDocuments: db.toolboxDocuments || [], ads: db.ads || [], adSettings: db.adSettings || { frequency: 4 } });
+  }
+
+
+  if (route === "GET /api/ads") {
+    const now = Date.now();
+    const activeAds = (db.ads || []).filter((ad) => ad.active && (!ad.startDate || Date.parse(ad.startDate) <= now) && (!ad.endDate || Date.parse(ad.endDate) >= now));
+    return json(response, 200, { ads: activeAds, adSettings: db.adSettings || { frequency: 4 } });
   }
 
   if (route === "POST /api/admin/events/delete") {
@@ -543,6 +551,34 @@ async function api(request, response) {
     else db.events.push(payload);
     await writeDb(db);
     return json(response, 200, { event: payload });
+  }
+
+
+  if (route === "POST /api/admin/ads") {
+    if (!isAdmin(user)) return json(response, 403, { error: "Admin access required." });
+    const input = await body(request);
+    const ad = input.id ? db.ads.find((item) => item.id === input.id) : null;
+    const payload = { id: input.id || id("ad"), imageUrl: String(input.imageUrl || ""), copy: String(input.copy || ""), ctaText: String(input.ctaText || "Learn more"), ctaUrl: String(input.ctaUrl || ""), startDate: String(input.startDate || ""), endDate: String(input.endDate || ""), active: input.active !== false };
+    if (!payload.imageUrl || !payload.ctaUrl) return json(response, 400, { error: "Ad image and CTA URL required." });
+    if (ad) Object.assign(ad, payload); else db.ads.push(payload);
+    await writeDb(db);
+    return json(response, 200, { ads: db.ads, adSettings: db.adSettings || { frequency: 4 } });
+  }
+
+  if (route === "POST /api/admin/ads/delete") {
+    if (!isAdmin(user)) return json(response, 403, { error: "Admin access required." });
+    const input = await body(request);
+    db.ads = (db.ads || []).filter((ad) => ad.id !== input.id);
+    await writeDb(db);
+    return json(response, 200, { ok: true });
+  }
+
+  if (route === "POST /api/admin/ads/settings") {
+    if (!isAdmin(user)) return json(response, 403, { error: "Admin access required." });
+    const input = await body(request);
+    db.adSettings = { frequency: Math.max(1, Number(input.frequency || 4)) };
+    await writeDb(db);
+    return json(response, 200, { adSettings: db.adSettings });
   }
 
   if (route === "POST /api/admin/badges") {
