@@ -30,7 +30,8 @@ const state = {
   profileEdit: null,
   adminEventEdit: null,
   adminBadgeEdit: null,
-  adminSection: "home"
+  adminSection: "home",
+  badgeTooltip: null
 };
 
 const industries = ["Technology", "Finance", "Arts", "Real Estate", "Healthcare", "Marketing", "Business Services", "Food & Hospitality", "Education", "Nonprofit", "Construction", "Other"];
@@ -83,7 +84,12 @@ function messagePreview(message) { if (!message) return "No messages yet — sta
 function messageTime(message) { if (!message?.createdAt) return ""; return new Date(message.createdAt).toLocaleDateString([], { month: "short", day: "numeric" }); }
 function businessTypeText(value) { return asArray(value).join(", "); }
 function badgeMeta(name) { return state.data.badges.find((badge) => badge.name === name) || state.data.admin?.badges?.find((badge) => badge.name === name) || { name, iconUrl: "" }; }
-function badgeChip(name) { const badge = badgeMeta(name); return `<div class="badge-chip">${badge.iconUrl ? `<img src="${esc(badge.iconUrl)}" alt="${esc(name)} badge icon">` : "🏆"}<span>${esc(name)}</span></div>`; }
+function badgeDescription(badge) {
+  if (badge?.criteriaType === "connections") return "Connect with members";
+  if (["events", "attendances"].includes(badge?.criteriaType)) return "Attend community events";
+  return "Prime achievement unlocked";
+}
+function badgeChip(name) { const badge = badgeMeta(name); return `<button class="badge-chip" data-badge-name="${esc(name)}">${badge.iconUrl ? `<img src="${esc(badge.iconUrl)}" alt="${esc(name)} badge icon">` : "🏆"}<span>${esc(name)}</span></button>`; }
 function findPublicProfile(userId) {
   for (const event of state.data.events) {
     const attendee = event.attendees.find((item) => item.id === userId);
@@ -211,10 +217,13 @@ async function saveProfile(profile, nextTab = "home") {
 function renderApp() {
   const tabs = [["home", "Home"], ["events", "Events"], ["connections", "Connect"], ["messages", "Messages"], ["feed", "Feed"], ["toolbox", "Toolbox"], ["account", "Account"]];
   const adminButton = state.user.isAdmin ? `<button class="admin-top-button" data-admin-top>${navIcon("admin")}<span>Admin</span></button>` : "";
-  app.innerHTML = `<main class="page"><div class="app-wrap"><section class="phone"><header class="top"><div><p class="eyebrow">Prime Connects Inc.</p><h1>One Network. Endless Possibilities.</h1></div><div class="top-actions">${adminButton}<button class="icon home-icon" data-home title="Home">${navIcon("home")}</button></div></header><div class="content">${screen()}</div><nav class="nav">${tabs.map(([id, label]) => `<button class="${state.tab === id ? "active" : ""}" data-tab="${id}">${navIcon(id)}<span>${label}</span></button>`).join("")}</nav></section><aside class="desktop-panel"><p class="eyebrow">MVP Console</p><h2>Built for mobile and ready for web.</h2><p>Use Home to return to the signed-in landing page. Admin users can manage events, flyers, RSVP links, badges, toolbox documents, and users from the top Admin button.</p><div class="metrics"><div><strong>${state.data.events.length}</strong><span>Published events</span></div><div><strong>${state.data.connections.length}</strong><span>Your connections</span></div></div></aside></div></main>`;
+  app.innerHTML = `<main class="page"><div class="app-wrap"><section class="phone"><header class="top"><div><p class="eyebrow">Prime Connects Inc.</p><h1>One Network. Endless Possibilities.</h1></div><div class="top-actions">${adminButton}<button class="icon home-icon" data-home title="Home">${navIcon("home")}</button></div></header><div class="content">${screen()}</div><nav class="nav">${tabs.map(([id, label]) => `<button class="${state.tab === id ? "active" : ""}" data-tab="${id}">${navIcon(id)}<span>${label}</span></button>`).join("")}</nav></section><aside class="desktop-panel"><p class="eyebrow">MVP Console</p><h2>Built for mobile and ready for web.</h2><p>Use Home to return to the signed-in landing page. Admin users can manage events, flyers, RSVP links, badges, toolbox documents, and users from the top Admin button.</p><div class="metrics"><div><strong>${state.data.events.length}</strong><span>Published events</span></div><div><strong>${state.data.connections.length}</strong><span>Your connections</span></div></div></aside></div>${state.badgeTooltip ? `<div class="badge-tooltip-overlay" data-badge-overlay><div class="badge-tooltip" role="dialog" aria-label="Badge details"><button class="badge-tooltip-close" data-close-badge-tooltip aria-label="Close badge details">×</button><div class="badge-tooltip-head">${state.badgeTooltip.iconUrl ? `<img src="${esc(state.badgeTooltip.iconUrl)}" alt="${esc(state.badgeTooltip.name)} badge icon">` : `<span class="badge-tooltip-fallback">🏆</span>`}<strong>${esc(state.badgeTooltip.name)}</strong></div><p>${esc(state.badgeTooltip.description)}</p></div></div>` : ""}</main>`;
   document.querySelectorAll("[data-tab]").forEach((button) => button.onclick = () => { state.tab = button.dataset.tab; if (state.tab === "messages") state.selectedThread = null; render(); });
   document.querySelector("[data-home]").onclick = () => { state.tab = "home"; render(); };
   document.querySelector("[data-admin-top]")?.addEventListener("click", () => { state.tab = "admin"; state.adminSection = "home"; render(); });
+  document.querySelectorAll("[data-badge-name]").forEach((button) => button.onclick = () => { const badge = badgeMeta(button.dataset.badgeName); state.badgeTooltip = { name: badge.name || button.dataset.badgeName, iconUrl: badge.iconUrl || "", description: badgeDescription(badge) }; render(); });
+  document.querySelector("[data-close-badge-tooltip]")?.addEventListener("click", () => { state.badgeTooltip = null; render(); });
+  document.querySelector("[data-badge-overlay]")?.addEventListener("click", (event) => { if (event.target.matches("[data-badge-overlay]")) { state.badgeTooltip = null; render(); } });
   bindScreen();
 }
 function screen() { return ({ home: homeScreen, events: eventsScreen, connections: connectionsScreen, messages: messagesScreen, feed: feedScreen, toolbox: toolboxScreen, account: accountScreen, admin: adminScreen, profile: profileScreen })[state.tab](); }
