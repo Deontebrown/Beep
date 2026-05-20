@@ -7,6 +7,7 @@
       "emailVerified": true,
       "failedLoginAttempts": 0,
       "lockedUntilReset": false,
+      "termsAccepted": true,
       "profileComplete": true,
       "profile": {
         "fullName": "Maya Johnson",
@@ -66,6 +67,7 @@
       "emailVerified": true,
       "failedLoginAttempts": 0,
       "lockedUntilReset": false,
+      "termsAccepted": true,
       "profileComplete": true,
       "profile": {
         "fullName": "Darius King",
@@ -116,6 +118,7 @@
       "emailVerified": true,
       "failedLoginAttempts": 0,
       "lockedUntilReset": false,
+      "termsAccepted": true,
       "profileComplete": true,
       "profile": {
         "fullName": "Nia Brooks",
@@ -172,6 +175,7 @@
       "failedLoginAttempts": 0,
       "lockedUntilReset": false,
       "isAdmin": true,
+      "termsAccepted": true,
       "profileComplete": true,
       "lastSeenAt": "2026-05-13T12:05:00.000Z",
       "profile": {

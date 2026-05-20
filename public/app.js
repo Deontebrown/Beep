@@ -112,6 +112,7 @@ async function loadAppData() {
 }
 function render() {
   if (!state.user) return renderAuth();
+  if (!state.user.termsAccepted) return renderTerms();
   if (!state.user.profileComplete) return renderOnboarding();
   renderApp();
 }
@@ -143,7 +144,7 @@ async function authSubmit() {
     const result = await api("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
     state.user = result.user;
     state.tab = "home";
-    if (state.user.profileComplete) await loadAppData();
+    if (state.user.termsAccepted && state.user.profileComplete) await loadAppData();
     render();
   } catch (error) { setStatus(error.message); }
 }
@@ -151,6 +152,14 @@ async function verify() {
   const result = await api("/api/auth/verify", { method: "POST", body: JSON.stringify({ token: state.verificationToken }) });
   state.user = result.user;
   render();
+}
+
+function renderTerms() {
+  app.innerHTML = `<main class="page"><section class="panel terms-panel"><p class="eyebrow">Before you continue</p><h2>Terms and Conditions</h2><p>Prime Connects is for professional networking only. By continuing, you agree to use the platform for business introductions, events, collaboration, and community building.</p><h3>User conduct</h3><p>No nudity, profanity, harassment, hate speech, threats, spam, explicit content, or abusive behavior is allowed.</p><h3>Privacy and data usage</h3><p>Your profile, event activity, connections, messages, feed posts, uploaded content, and toolbox activity may be stored and used to operate the app, personalize matches, moderate content, improve features, and support account security.</p><h3>Account responsibility</h3><p>You are responsible for keeping your login secure, ensuring your profile and posts are accurate, and following all applicable laws and professional standards.</p><label class="terms-check"><input id="termsAgree" type="checkbox">I agree to the Terms and Conditions</label><button class="primary disabled-button" id="termsContinue" disabled>Continue</button><p class="status">${esc(state.status)}</p></section></main>`;
+  const checkbox = document.querySelector("#termsAgree");
+  const button = document.querySelector("#termsContinue");
+  checkbox.onchange = () => { button.disabled = !checkbox.checked; button.classList.toggle("disabled-button", !checkbox.checked); };
+  button.onclick = async () => { if (!checkbox.checked) return; const result = await api("/api/terms/accept", { method: "POST" }); state.user = result.user; if (state.user.profileComplete) await loadAppData(); render(); };
 }
 
 function renderOnboarding() {

@@ -36,6 +36,7 @@ export default function App() {
   const [selectedThread, setSelectedThread] = useState(null);
   const [postBody, setPostBody] = useState("");
   const [messageBody, setMessageBody] = useState("");
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const [data, setData] = useState({ events: [], connections: [], feed: [], messages: [], swaps: [], toolboxDocuments: [], badges: [], admin: null });
 
   const callApi = useCallback((path, options) => api(path, { token, ...options }), [token]);
@@ -91,8 +92,18 @@ export default function App() {
   async function logout() {
     setToken(null);
     setUser(null);
+    setTermsAgreed(false);
     setData({ events: [], connections: [], feed: [], messages: [], swaps: [], toolboxDocuments: [], badges: [], admin: null });
     setStatus("");
+  }
+
+  async function acceptTerms() {
+    if (!termsAgreed) return;
+    try {
+      const result = await callApi("/api/terms/accept", { method: "POST" });
+      setUser(result.user);
+      setStatus("");
+    } catch (error) { setStatus(error.message); }
   }
 
   async function sharePost() {
@@ -136,7 +147,13 @@ export default function App() {
     return <SafeAreaView style={styles.safe}><StatusBar barStyle="light-content" /><ScrollView contentContainerStyle={styles.authPage}><Text style={styles.brand}>♛ Prime Connects</Text><Text style={styles.heroTitle}>Mobile MVP</Text><Text style={styles.muted}>Connect with members, RSVP to events, message your network, and browse the Prime Business Toolbox from Expo.</Text><Text style={styles.label}>API URL</Text><Text style={styles.apiUrl}>{apiUrl()}</Text><TextInput value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" style={styles.input} placeholder="Email" /><TextInput value={password} onChangeText={setPassword} secureTextEntry style={styles.input} placeholder="Password" /><Button title={loading ? "Signing in..." : "Sign in"} onPress={login} /><Text style={styles.status}>{status}</Text><Text style={styles.hint}>Use EXPO_PUBLIC_API_URL=http://YOUR-LAN-IP:3000 when running on a physical device.</Text></ScrollView></SafeAreaView>;
   }
 
+  if (!user.termsAccepted) return <TermsScreen agreed={termsAgreed} setAgreed={setTermsAgreed} acceptTerms={acceptTerms} status={status} />;
+
   return <SafeAreaView style={styles.safe}><StatusBar barStyle="light-content" /><View style={styles.header}><View><Text style={styles.eyebrow}>Prime Connects Inc.</Text><Text style={styles.headerTitle}>One Network.</Text></View>{user.isAdmin ? <TouchableOpacity onPress={() => setTab("admin")} style={styles.adminPill}><Text style={styles.adminPillText}>Admin</Text></TouchableOpacity> : null}</View><ScrollView refreshControl={<RefreshControl refreshing={loading} onRefresh={loadAppData} />} contentContainerStyle={styles.content}>{status ? <Text style={styles.status}>{status}</Text> : null}{tab === "home" && <Home user={user} counts={counts} data={data} setTab={setTab} />}{tab === "events" && <Events events={data.events} selectedEvent={selectedEvent} setSelectedEventId={setSelectedEventId} checkIn={checkIn} connect={connect} />}{tab === "connections" && <Connections data={data} connect={connect} setTab={setTab} setSelectedThread={setSelectedThread} />}{tab === "messages" && <Messages connections={data.connections} selectedThread={selectedThread} setSelectedThread={setSelectedThread} threadMessages={threadMessages} user={user} messageBody={messageBody} setMessageBody={setMessageBody} sendMessage={sendMessage} />}{tab === "feed" && <Feed user={user} posts={data.feed} postBody={postBody} setPostBody={setPostBody} sharePost={sharePost} deleteOwnPost={deleteOwnPost} />}{tab === "toolbox" && <Toolbox documents={data.toolboxDocuments} />}{tab === "account" && <Account user={user} logout={logout} />}{tab === "admin" && <Admin admin={data.admin} />}</ScrollView><View style={styles.nav}>{tabs.map((item) => <TouchableOpacity key={item} onPress={() => setTab(item)} style={styles.navItem}><Text style={[styles.navIcon, tab === item && styles.activeNav]}>{icons[item]}</Text><Text style={[styles.navText, tab === item && styles.activeNav]}>{labels[item]}</Text></TouchableOpacity>)}</View></SafeAreaView>;
+}
+
+function TermsScreen({ agreed, setAgreed, acceptTerms, status }) {
+  return <SafeAreaView style={styles.safe}><StatusBar barStyle="light-content" /><ScrollView contentContainerStyle={styles.authPage}><Text style={styles.brand}>Prime Connects Inc.</Text><Text style={styles.heroTitle}>Terms and Conditions</Text><Text style={styles.muted}>Prime Connects is for professional networking only. Use the platform for business introductions, events, collaboration, and community building.</Text><Card><Text style={styles.cardTitle}>User conduct</Text><Text style={styles.body}>No nudity, profanity, harassment, hate speech, threats, spam, explicit content, or abusive behavior is allowed.</Text><Text style={styles.cardTitle}>Privacy and data usage</Text><Text style={styles.body}>Your profile, event activity, connections, messages, feed posts, uploaded content, and toolbox activity may be stored and used to operate the app, personalize matches, moderate content, improve features, and protect accounts.</Text><Text style={styles.cardTitle}>Account responsibility</Text><Text style={styles.body}>You are responsible for keeping your login secure, ensuring your profile and posts are accurate, and following all applicable laws and professional standards.</Text></Card><TouchableOpacity style={styles.termsRow} onPress={() => setAgreed(!agreed)}><View style={[styles.checkbox, agreed && styles.checkboxChecked]}><Text style={styles.checkboxText}>{agreed ? "✓" : ""}</Text></View><Text style={styles.termsText}>I agree to the Terms and Conditions</Text></TouchableOpacity><Button title="Continue" onPress={acceptTerms} variant={agreed ? "primary" : "disabled"} /><Text style={styles.status}>{status}</Text></ScrollView></SafeAreaView>;
 }
 
 function Home({ user, counts, data, setTab }) {
@@ -204,10 +221,12 @@ const styles = StyleSheet.create({
   primaryButton: { backgroundColor: gold },
   secondaryButton: { backgroundColor: "#F9F3E3", borderColor: "#D4B96A", borderWidth: 1 },
   miniButton: { backgroundColor: dark, paddingVertical: 8, paddingHorizontal: 10 },
+  disabledButton: { backgroundColor: "#d9d5cc" },
   buttonText: { fontWeight: "900" },
   primaryButtonText: { color: "white" },
   secondaryButtonText: { color: "#8B6914" },
   miniButtonText: { color: gold, fontSize: 12 },
+  disabledButtonText: { color: "#888" },
   nav: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", backgroundColor: dark, borderTopColor: "rgba(212,185,106,.35)", borderTopWidth: 1, paddingTop: 8, paddingBottom: 18 },
   navItem: { flex: 1, alignItems: "center" },
   navIcon: { color: "#8d8679", fontSize: 18 },
@@ -230,4 +249,9 @@ const styles = StyleSheet.create({
   bubbleMeta: { color: "#777", fontSize: 11, marginTop: 4 },
   mineText: { color: "white" },
   mineMeta: { color: gold },
+  termsRow: { flexDirection: "row", alignItems: "center", backgroundColor: "#F9F3E3", borderColor: "rgba(212,185,106,.45)", borderWidth: 1, borderRadius: 16, padding: 12, marginTop: 12 },
+  checkbox: { width: 24, height: 24, borderRadius: 7, borderWidth: 2, borderColor: gold, alignItems: "center", justifyContent: "center", marginRight: 10 },
+  checkboxChecked: { backgroundColor: gold },
+  checkboxText: { color: "white", fontWeight: "900" },
+  termsText: { color: dark, fontWeight: "900", flex: 1 },
 });

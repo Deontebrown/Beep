@@ -52,6 +52,7 @@ function normalizeDb(db) {
   for (const user of db.users) {
     user.badges ||= [];
     user.isAdmin = Boolean(user.isAdmin) || user.email?.toLowerCase() === "networking@primeconnectsindy.com";
+    user.termsAccepted = Boolean(user.termsAccepted);
   }
   db.badges = db.badges.map((badge) => typeof badge === "string" ? { name: badge, criteriaType: "manual", criteriaCount: 0, iconUrl: "" } : { iconUrl: "", criteriaType: "manual", criteriaCount: 0, ...badge });
   return db;
@@ -181,7 +182,7 @@ function isAllowedToolboxDocument(fileName, fileType) {
 
 function publicUser(user) {
   if (!user) return null;
-  return { id: user.id, email: user.email, isAdmin: isAdmin(user), emailVerified: user.emailVerified, profileComplete: user.profileComplete, profile: user.profile, badges: user.badges ?? [], onlineStatus: onlineStatus(user) };
+  return { id: user.id, email: user.email, isAdmin: isAdmin(user), emailVerified: user.emailVerified, profileComplete: user.profileComplete, termsAccepted: Boolean(user.termsAccepted), profile: user.profile, badges: user.badges ?? [], onlineStatus: onlineStatus(user) };
 }
 
 function publicBadges(db) {
@@ -241,7 +242,7 @@ async function api(request, response) {
     if (!email.includes("@") || password.length < 8) return json(response, 400, { error: "Use a valid email and a password with 8+ characters." });
     if (db.users.some((user) => user.email === email)) return json(response, 409, { error: "An account with this email already exists." });
     const verificationToken = randomBytes(24).toString("hex");
-    db.users.push({ id: id("user"), email, passwordHash: hashPassword(password), emailVerified: false, verificationToken, failedLoginAttempts: 0, lockedUntilReset: false, profileComplete: false, profile: null, badges: [], isAdmin: false, lastSeenAt: null });
+    db.users.push({ id: id("user"), email, passwordHash: hashPassword(password), emailVerified: false, verificationToken, failedLoginAttempts: 0, lockedUntilReset: false, profileComplete: false, termsAccepted: false, profile: null, badges: [], isAdmin: false, lastSeenAt: null });
     await writeDb(db);
     return json(response, 200, { verificationToken });
   }
@@ -294,6 +295,15 @@ async function api(request, response) {
   const user = authUser(request, db);
   if (!user) return json(response, 401, { error: "Authentication required." });
   user.lastSeenAt = new Date().toISOString();
+
+  if (route === "POST /api/terms/accept") {
+    user.termsAccepted = true;
+    user.termsAcceptedAt = new Date().toISOString();
+    await writeDb(db);
+    return json(response, 200, { user: publicUser(user) });
+  }
+
+  if (!user.termsAccepted) return json(response, 451, { error: "Terms and Conditions acceptance required." });
 
   if (route === "POST /api/profile") {
     const input = await body(request);
