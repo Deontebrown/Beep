@@ -89,12 +89,24 @@ export default function App() {
     }
   }
 
-  async function logout() {
+  function clearSession() {
     setToken(null);
     setUser(null);
     setTermsAgreed(false);
     setData({ events: [], connections: [], feed: [], messages: [], swaps: [], toolboxDocuments: [], badges: [], admin: null });
     setStatus("");
+  }
+
+  async function logout() {
+    clearSession();
+  }
+
+  function deactivateAccount() {
+    Alert.alert("Deactivate Account", "Are you sure you want to deactivate your account? You can reactivate it by logging back in.", [{ text: "Cancel", style: "cancel" }, { text: "Confirm", onPress: async () => { await callApi("/api/account/deactivate", { method: "POST" }); clearSession(); } }]);
+  }
+
+  function deleteAccount() {
+    Alert.alert("Delete Account", "Are you sure you want to delete your account? This cannot be undone.", [{ text: "Cancel", style: "cancel" }, { text: "Continue", style: "destructive", onPress: () => Alert.alert("Delete Forever?", "This will permanently delete all your data, posts, messages and connections forever. Are you absolutely sure?", [{ text: "Cancel", style: "cancel" }, { text: "Delete Forever", style: "destructive", onPress: async () => { await callApi("/api/account/delete", { method: "POST" }); clearSession(); } }]) } }]);
   }
 
   async function acceptTerms() {
@@ -149,7 +161,7 @@ export default function App() {
 
   if (!user.termsAccepted) return <TermsScreen agreed={termsAgreed} setAgreed={setTermsAgreed} acceptTerms={acceptTerms} status={status} />;
 
-  return <SafeAreaView style={styles.safe}><StatusBar barStyle="light-content" /><View style={styles.header}><View><Text style={styles.eyebrow}>Prime Connects Inc.</Text><Text style={styles.headerTitle}>One Network.</Text></View>{user.isAdmin ? <TouchableOpacity onPress={() => setTab("admin")} style={styles.adminPill}><Text style={styles.adminPillText}>Admin</Text></TouchableOpacity> : null}</View><ScrollView refreshControl={<RefreshControl refreshing={loading} onRefresh={loadAppData} />} contentContainerStyle={styles.content}>{status ? <Text style={styles.status}>{status}</Text> : null}{tab === "home" && <Home user={user} counts={counts} data={data} setTab={setTab} />}{tab === "events" && <Events events={data.events} selectedEvent={selectedEvent} setSelectedEventId={setSelectedEventId} checkIn={checkIn} connect={connect} />}{tab === "connections" && <Connections data={data} connect={connect} setTab={setTab} setSelectedThread={setSelectedThread} />}{tab === "messages" && <Messages connections={data.connections} selectedThread={selectedThread} setSelectedThread={setSelectedThread} threadMessages={threadMessages} user={user} messageBody={messageBody} setMessageBody={setMessageBody} sendMessage={sendMessage} />}{tab === "feed" && <Feed user={user} posts={data.feed} postBody={postBody} setPostBody={setPostBody} sharePost={sharePost} deleteOwnPost={deleteOwnPost} />}{tab === "toolbox" && <Toolbox documents={data.toolboxDocuments} />}{tab === "account" && <Account user={user} logout={logout} />}{tab === "admin" && <Admin admin={data.admin} />}</ScrollView><View style={styles.nav}>{tabs.map((item) => <TouchableOpacity key={item} onPress={() => setTab(item)} style={styles.navItem}><Text style={[styles.navIcon, tab === item && styles.activeNav]}>{icons[item]}</Text><Text style={[styles.navText, tab === item && styles.activeNav]}>{labels[item]}</Text></TouchableOpacity>)}</View></SafeAreaView>;
+  return <SafeAreaView style={styles.safe}><StatusBar barStyle="light-content" /><View style={styles.header}><View><Text style={styles.eyebrow}>Prime Connects Inc.</Text><Text style={styles.headerTitle}>One Network.</Text></View>{user.isAdmin ? <TouchableOpacity onPress={() => setTab("admin")} style={styles.adminPill}><Text style={styles.adminPillText}>Admin</Text></TouchableOpacity> : null}</View><ScrollView refreshControl={<RefreshControl refreshing={loading} onRefresh={loadAppData} />} contentContainerStyle={styles.content}>{status ? <Text style={styles.status}>{status}</Text> : null}{tab === "home" && <Home user={user} counts={counts} data={data} setTab={setTab} />}{tab === "events" && <Events events={data.events} selectedEvent={selectedEvent} setSelectedEventId={setSelectedEventId} checkIn={checkIn} connect={connect} />}{tab === "connections" && <Connections data={data} connect={connect} setTab={setTab} setSelectedThread={setSelectedThread} />}{tab === "messages" && <Messages connections={data.connections} selectedThread={selectedThread} setSelectedThread={setSelectedThread} threadMessages={threadMessages} user={user} messageBody={messageBody} setMessageBody={setMessageBody} sendMessage={sendMessage} />}{tab === "feed" && <Feed user={user} posts={data.feed} postBody={postBody} setPostBody={setPostBody} sharePost={sharePost} deleteOwnPost={deleteOwnPost} />}{tab === "toolbox" && <Toolbox documents={data.toolboxDocuments} />}{tab === "account" && <Account user={user} logout={logout} deactivateAccount={deactivateAccount} deleteAccount={deleteAccount} />}{tab === "admin" && <Admin admin={data.admin} />}</ScrollView><View style={styles.nav}>{tabs.map((item) => <TouchableOpacity key={item} onPress={() => setTab(item)} style={styles.navItem}><Text style={[styles.navIcon, tab === item && styles.activeNav]}>{icons[item]}</Text><Text style={[styles.navText, tab === item && styles.activeNav]}>{labels[item]}</Text></TouchableOpacity>)}</View></SafeAreaView>;
 }
 
 function TermsScreen({ agreed, setAgreed, acceptTerms, status }) {
@@ -182,8 +194,8 @@ function Toolbox({ documents }) {
   return <View><Text style={styles.title}>Prime Business Toolbox</Text>{documents.map((doc) => <Card key={doc.id}><Text style={styles.cardTitle}>{doc.title}</Text><Text style={styles.muted}>{doc.category} · {doc.fileName}</Text><Text style={styles.body}>{doc.description}</Text><Button title="Open document" variant="secondary" onPress={() => Linking.openURL(doc.fileData)} /></Card>)}</View>;
 }
 
-function Account({ user, logout }) {
-  return <View><Card style={styles.profileCard}><Avatar profile={user.profile} size={86} /><Text style={styles.title}>{user.profile?.fullName}</Text><Text style={styles.muted}>{user.email}</Text></Card><Button title="Log out" variant="secondary" onPress={logout} /></View>;
+function Account({ user, logout, deactivateAccount, deleteAccount }) {
+  return <View><Card style={styles.profileCard}><Avatar profile={user.profile} size={86} /><Text style={styles.title}>{user.profile?.fullName}</Text><Text style={styles.muted}>{user.email}</Text></Card><Button title="Log out" variant="secondary" onPress={logout} /><View style={styles.accountDangerZone}><TouchableOpacity onPress={deactivateAccount}><Text style={styles.deactivateText}>Deactivate Account</Text></TouchableOpacity><TouchableOpacity onPress={deleteAccount}><Text style={styles.deleteText}>Delete Account</Text></TouchableOpacity></View></View>;
 }
 
 function Admin({ admin }) {
@@ -254,4 +266,7 @@ const styles = StyleSheet.create({
   checkboxChecked: { backgroundColor: gold },
   checkboxText: { color: "white", fontWeight: "900" },
   termsText: { color: dark, fontWeight: "900", flex: 1 },
+  accountDangerZone: { borderTopColor: "rgba(0,0,0,.08)", borderTopWidth: 1, marginTop: 26, paddingTop: 14, gap: 8 },
+  deactivateText: { color: "#777", fontSize: 12, fontWeight: "500" },
+  deleteText: { color: "#9b6a66", fontSize: 12, fontWeight: "500" },
 });

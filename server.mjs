@@ -53,6 +53,7 @@ function normalizeDb(db) {
     user.badges ||= [];
     user.isAdmin = Boolean(user.isAdmin) || user.email?.toLowerCase() === "networking@primeconnectsindy.com";
     user.termsAccepted = Boolean(user.termsAccepted);
+    user.deactivated = Boolean(user.deactivated);
   }
   db.badges = db.badges.map((badge) => typeof badge === "string" ? { name: badge, criteriaType: "manual", criteriaCount: 0, iconUrl: "" } : { iconUrl: "", criteriaType: "manual", criteriaCount: 0, ...badge });
   return db;
@@ -182,7 +183,7 @@ function isAllowedToolboxDocument(fileName, fileType) {
 
 function publicUser(user) {
   if (!user) return null;
-  return { id: user.id, email: user.email, isAdmin: isAdmin(user), emailVerified: user.emailVerified, profileComplete: user.profileComplete, termsAccepted: Boolean(user.termsAccepted), profile: user.profile, badges: user.badges ?? [], onlineStatus: onlineStatus(user) };
+  return { id: user.id, email: user.email, isAdmin: isAdmin(user), emailVerified: user.emailVerified, profileComplete: user.profileComplete, termsAccepted: Boolean(user.termsAccepted), deactivated: Boolean(user.deactivated), profile: user.profile, badges: user.badges ?? [], onlineStatus: onlineStatus(user) };
 }
 
 function publicBadges(db) {
@@ -242,7 +243,7 @@ async function api(request, response) {
     if (!email.includes("@") || password.length < 8) return json(response, 400, { error: "Use a valid email and a password with 8+ characters." });
     if (db.users.some((user) => user.email === email)) return json(response, 409, { error: "An account with this email already exists." });
     const verificationToken = randomBytes(24).toString("hex");
-    db.users.push({ id: id("user"), email, passwordHash: hashPassword(password), emailVerified: false, verificationToken, failedLoginAttempts: 0, lockedUntilReset: false, profileComplete: false, termsAccepted: false, profile: null, badges: [], isAdmin: false, lastSeenAt: null });
+    db.users.push({ id: id("user"), email, passwordHash: hashPassword(password), emailVerified: false, verificationToken, failedLoginAttempts: 0, lockedUntilReset: false, profileComplete: false, termsAccepted: false, deactivated: false, profile: null, badges: [], isAdmin: false, lastSeenAt: null });
     await writeDb(db);
     return json(response, 200, { verificationToken });
   }
@@ -272,6 +273,7 @@ async function api(request, response) {
       return json(response, 401, { error: user.lockedUntilReset ? "Too many attempts. Password reset required." : "Invalid email or password." });
     }
     user.failedLoginAttempts = 0;
+    user.deactivated = false;
     user.lastSeenAt = new Date().toISOString();
     await writeDb(db);
     const authToken = sessionToken(user.id);
@@ -303,6 +305,25 @@ async function api(request, response) {
     return json(response, 200, { user: publicUser(user) });
   }
 
+  if (route === "POST /api/account/deactivate") {
+    user.deactivated = true;
+    user.deactivatedAt = new Date().toISOString();
+    await writeDb(db);
+    return json(response, 200, { ok: true }, { "set-cookie": `${SESSION_COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0` });
+  }
+
+  if (route === "POST /api/account/delete") {
+    const userId = user.id;
+    db.users = db.users.filter((candidate) => candidate.id !== userId);
+    db.attendances = db.attendances.filter((attendance) => attendance.userId !== userId);
+    db.connections = db.connections.filter((connection) => connection.requesterId !== userId && connection.recipientId !== userId);
+    db.messages = db.messages.filter((message) => message.senderId !== userId && message.receiverId !== userId);
+    db.feedPosts = db.feedPosts.filter((post) => post.authorId !== userId).map((post) => ({ ...post, comments: (post.comments || []).filter((comment) => comment.authorId !== userId) }));
+    db.skillSwaps = db.skillSwaps.filter((swap) => swap.userId !== userId);
+    await writeDb(db);
+    return json(response, 200, { ok: true }, { "set-cookie": `${SESSION_COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0` });
+  }
+
   if (!user.termsAccepted) return json(response, 451, { error: "Terms and Conditions acceptance required." });
 
   if (route === "POST /api/profile") {
@@ -320,7 +341,7 @@ async function api(request, response) {
   if (route === "GET /api/events") {
     const connectedIds = new Set(db.connections.filter((connection) => connection.requesterId === user.id || connection.recipientId === user.id).map((connection) => connection.requesterId === user.id ? connection.recipientId : connection.requesterId));
     const events = db.events.map((event) => {
-      const attendees = db.attendances.filter((attendance) => attendance.eventId === event.id && attendance.checkedIn).map((attendance) => db.users.find((candidate) => candidate.id === attendance.userId)).filter(Boolean).filter((candidate) => candidate.id !== user.id && candidate.profileComplete).map((candidate) => ({ ...candidate.profile, id: candidate.id, badges: candidate.badges, onlineStatus: onlineStatus(candidate), connected: connectedIds.has(candidate.id), matchScore: scoreMatch(user.profile, candidate.profile, db) })).sort((a, b) => b.matchScore - a.matchScore);
+      const attendees = db.attendances.filter((attendance) => attendance.eventId === event.id && attendance.checkedIn).map((attendance) => db.users.find((candidate) => candidate.id === attendance.userId)).filter(Boolean).filter((candidate) => candidate.id !== user.id && candidate.profileComplete && !candidate.deactivated).map((candidate) => ({ ...candidate.profile, id: candidate.id, badges: candidate.badges, onlineStatus: onlineStatus(candidate), connected: connectedIds.has(candidate.id), matchScore: scoreMatch(user.profile, candidate.profile, db) })).sort((a, b) => b.matchScore - a.matchScore);
       return { ...event, attendees, pendingMatches: attendees.length < 2 };
     });
     return json(response, 200, { events });
@@ -338,13 +359,13 @@ async function api(request, response) {
   }
 
   if (route === "GET /api/connections") {
-    const connections = db.connections.filter((connection) => connection.requesterId === user.id || connection.recipientId === user.id).map((connection) => ({ ...connection, user: publicUser(db.users.find((candidate) => candidate.id === (connection.requesterId === user.id ? connection.recipientId : connection.requesterId))) }));
+    const connections = db.connections.filter((connection) => connection.requesterId === user.id || connection.recipientId === user.id).map((connection) => ({ ...connection, user: publicUser(db.users.find((candidate) => candidate.id === (connection.requesterId === user.id ? connection.recipientId : connection.requesterId) && !candidate.deactivated)) }));
     return json(response, 200, { connections });
   }
 
   if (route === "POST /api/connections") {
     const input = await body(request);
-    if (input.recipientId === user.id || !db.users.some((candidate) => candidate.id === input.recipientId)) return json(response, 400, { error: "Choose a valid member to connect with." });
+    if (input.recipientId === user.id || !db.users.some((candidate) => candidate.id === input.recipientId && !candidate.deactivated)) return json(response, 400, { error: "Choose a valid member to connect with." });
     const existing = db.connections.find((connection) => (connection.requesterId === user.id && connection.recipientId === input.recipientId) || (connection.requesterId === input.recipientId && connection.recipientId === user.id));
     if (existing) existing.note = input.note ?? existing.note;
     else db.connections.push({ id: id("connection"), requesterId: user.id, recipientId: input.recipientId, status: "CONNECTED", note: input.note ?? "", createdAt: new Date().toISOString() });
@@ -356,7 +377,7 @@ async function api(request, response) {
     return json(response, 200, { ok: true });
   }
 
-  if (route === "GET /api/feed") return json(response, 200, { posts: db.feedPosts.map((post) => ({ ...post, comments: (post.comments || []).map((comment) => ({ ...comment, author: publicUser(db.users.find((candidate) => candidate.id === comment.authorId)) })), author: publicUser(db.users.find((candidate) => candidate.id === post.authorId)) })) });
+  if (route === "GET /api/feed") return json(response, 200, { posts: db.feedPosts.map((post) => ({ ...post, comments: (post.comments || []).map((comment) => ({ ...comment, author: publicUser(db.users.find((candidate) => candidate.id === comment.authorId && !candidate.deactivated)) })), author: publicUser(db.users.find((candidate) => candidate.id === post.authorId && !candidate.deactivated)) })) });
 
   if (route === "POST /api/feed") {
     const input = await body(request);
@@ -443,7 +464,7 @@ async function api(request, response) {
     return json(response, 200, { ok: true });
   }
 
-  if (route === "GET /api/skill-swaps") return json(response, 200, { swaps: db.skillSwaps.map((swap) => ({ ...swap, user: publicUser(db.users.find((candidate) => candidate.id === swap.userId)) })) });
+  if (route === "GET /api/skill-swaps") return json(response, 200, { swaps: db.skillSwaps.map((swap) => ({ ...swap, user: publicUser(db.users.find((candidate) => candidate.id === swap.userId && !candidate.deactivated)) })) });
 
   if (route === "POST /api/skill-swaps") {
     const input = await body(request);
